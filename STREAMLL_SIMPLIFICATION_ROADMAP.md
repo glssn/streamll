@@ -137,26 +137,42 @@ class StreamllEvent:
 ## Phase 4: Terminal Sink Clarity (Week 6)
 
 ### Epic 6: Terminal Sink Simplification
-**Outcome**: Terminal sink is 50 lines of clear, simple code that just prints JSON.
+**Outcome**: Terminal sink is 50 lines of clear, simple code that just prints JSON. Rich formatting available as separate sink.
 
 **Success Metrics**:
 - Terminal sink < 50 lines
-- No async complexity
-- No rich formatting detection
-- Just works
+- RichTerminalSink provides formatting for those who want it
+- No async complexity in base sink
+- Both sinks just work
 
 **Tasks**:
 1. Remove async queue code (commented out anyway)
-2. Remove rich formatting (make it a separate `RichTerminalSink` if needed)
-3. Simplify to basic JSON printing
-4. Remove all configuration parameters
+2. Extract rich formatting to new `RichTerminalSink` class
+3. Simplify base TerminalSink to basic JSON printing
+4. Remove all configuration parameters from base sink
 5. One method: print event as formatted JSON
+6. Create RichTerminalSink with:
+   - Color-coded event types
+   - Formatted timestamps
+   - Collapsible data sections
+   - Progress indicators for token events
 
 **Final Implementation**:
 ```python
+# Base sink - simple and reliable
 class TerminalSink(BaseSink):
     def handle_event(self, event: StreamllEvent) -> None:
         print(json.dumps(event.model_dump(), indent=2, default=str))
+
+# Rich sink - optional enhanced formatting
+class RichTerminalSink(BaseSink):
+    def __init__(self):
+        from rich.console import Console
+        self.console = Console()
+    
+    def handle_event(self, event: StreamllEvent) -> None:
+        # Color-coded, formatted output
+        self.console.print(self._format_event(event))
 ```
 
 ---
