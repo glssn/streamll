@@ -1,0 +1,85 @@
+name: Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # Unit tests without infrastructure
+  unit-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+        dspy-version: ["2.6.24", "2.6.27", "3.0.1"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+      
+      - name: Install specific DSPy version
+        run: uv pip install dspy==${{ matrix.dspy-version }}
+
+      - name: Run unit tests
+        run: uv run pytest -m "not (redis or rabbitmq)" --cov=src/streamll
+
+      - name: Run linting
+        run: uv run ruff check .
+
+      - name: Run type checking
+        run: uvx ty check
+
+  # Integration tests with infrastructure
+  integration-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.13"]  # Reduced matrix for integration tests
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Start test infrastructure
+        run: docker-compose -f .github/docker-compose.test.yml up -d redis rabbitmq
+
+      - name: Wait for services
+        run: |
+          echo "Waiting for Redis..."
+          timeout 60 bash -c 'until docker-compose -f .github/docker-compose.test.yml exec -T redis redis-cli ping; do sleep 1; done'
+          echo "Waiting for RabbitMQ..."
+          timeout 60 bash -c 'until docker-compose -f .github/docker-compose.test.yml exec -T rabbitmq rabbitmq-diagnostics ping; do sleep 1; done'
+
+      - name: Run integration tests
+        run: |
+          export REDIS_URL="redis://localhost:6379"
+          export RABBITMQ_URL="amqp://streamll_test:streamll_test@localhost:5672/streamll"
+          uv run pytest -m "redis or rabbitmq" -v
+
+      - name: Stop test infrastructure
+        if: always()
+        run: docker-compose -f .github/docker-compose.test.yml down -v
