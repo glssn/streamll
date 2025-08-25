@@ -37,9 +37,7 @@ htmlcov/
 *.log
 *.tmp
 debug_*.py
-test_*.py
 *_debug.*
-*_test.*
 
 # Cache directories
 .ruff_cache/
