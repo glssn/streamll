@@ -3,7 +3,10 @@
 Handles execution context, sink management, and event routing.
 """
 
+import time
+import traceback
 from contextvars import ContextVar
+from datetime import UTC, datetime
 from typing import Any
 
 from nanoid import generate
@@ -169,10 +172,23 @@ def emit_event(event: StreamllEvent, module_instance: Any | None = None) -> None
 class StreamllContext:
     """Context manager for manual event tracing.
 
+    Automatically emits START and END/ERROR events, no code needed!
+
     Example:
+        # Simplest usage - just wrap your code
+        with streamll.trace("operation_name"):
+            do_work()  # START and END events emitted automatically
+
+        # With custom events
         with streamll.trace("operation_name") as ctx:
-            # Events emitted here will have this context
             result = do_work()
+            ctx.emit("custom_metric", data={"size": len(result)})
+
+    Events emitted:
+        - On enter: START event with operation name and timestamp
+        - On exit (success): END event with duration
+        - On exit (exception): ERROR event with exception details
+        - Custom: Any events you emit with ctx.emit()
     """
 
     def __init__(
@@ -203,11 +219,57 @@ class StreamllContext:
         Returns:
             Self for use in with statement
         """
-        # Save parent context if exists
-        # Generate or reuse execution_id
-        # Set our context as active
-        # Emit start event with operation
-        # Return self for 'as' binding
+        from streamll.models import generate_event_id
+
+        # Generate execution_id for this trace context
+        self.execution_id = generate_event_id()
+
+        # Track start time for duration calculation
+        self.start_time = time.time()
+
+        # Save parent context if exists (for nested traces)
+        self.parent_context = _execution_context.get(None)
+
+        # Set this context as active
+        _execution_context.set(
+            {
+                "execution_id": self.execution_id,
+                "operation": self.operation,
+                "metadata": self.metadata,
+            }
+        )
+
+        # Start local sinks if provided
+        for sink in self.local_sinks:
+            if hasattr(sink, "is_running") and not sink.is_running:
+                sink.start()
+
+        # Emit START event
+        start_event = StreamllEvent(
+            event_id=generate_event_id(),
+            execution_id=self.execution_id,
+            timestamp=datetime.now(UTC),
+            event_type="start",
+            module_name=self.module_name,
+            method_name=self.operation,
+            operation=self.operation,
+            data={**self.metadata, "stage": "start"},
+        )
+
+        # Emit to global sinks
+        emit_event(start_event)
+
+        # Also emit to local sinks
+        for sink in self.local_sinks:
+            if hasattr(sink, "is_running") and sink.is_running:
+                try:
+                    sink.handle_event(start_event)
+                except Exception as e:
+                    import logging
+
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"Local sink {type(sink).__name__} failed: {e}")
+
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
@@ -218,12 +280,74 @@ class StreamllContext:
             exc_val: Exception value if error occurred
             exc_tb: Exception traceback if error occurred
         """
-        # If exception, emit error event with details
-        # Otherwise emit end event
-        # Calculate duration if we tracked start time
+        from streamll.models import generate_event_id
+
+        # Calculate duration
+        duration = time.time() - self.start_time
+
+        if exc_type is not None:
+            # Emit ERROR event if exception occurred
+            error_event = StreamllEvent(
+                event_id=generate_event_id(),
+                execution_id=self.execution_id,
+                timestamp=datetime.now(UTC),
+                event_type="error",
+                module_name=self.module_name,
+                method_name=self.operation,
+                operation=self.operation,
+                data={
+                    **self.metadata,
+                    "duration_seconds": duration,
+                    "stage": "error",
+                    "error_type": exc_type.__name__,
+                    "error_message": str(exc_val),
+                    "traceback": "".join(traceback.format_tb(exc_tb)),
+                },
+            )
+            emit_event(error_event)
+
+            # Also emit to local sinks
+            for sink in self.local_sinks:
+                if hasattr(sink, "is_running") and sink.is_running:
+                    try:
+                        sink.handle_event(error_event)
+                    except Exception as e:
+                        import logging
+
+                        logger = logging.getLogger(__name__)
+                        logger.warning(f"Local sink {type(sink).__name__} failed: {e}")
+        else:
+            # Emit END event for successful completion
+            end_event = StreamllEvent(
+                event_id=generate_event_id(),
+                execution_id=self.execution_id,
+                timestamp=datetime.now(UTC),
+                event_type="end",
+                module_name=self.module_name,
+                method_name=self.operation,
+                operation=self.operation,
+                data={**self.metadata, "duration_seconds": duration, "stage": "end"},
+            )
+            emit_event(end_event)
+
+            # Also emit to local sinks
+            for sink in self.local_sinks:
+                if hasattr(sink, "is_running") and sink.is_running:
+                    try:
+                        sink.handle_event(end_event)
+                    except Exception as e:
+                        import logging
+
+                        logger = logging.getLogger(__name__)
+                        logger.warning(f"Local sink {type(sink).__name__} failed: {e}")
+
         # Restore parent context
-        # Don't suppress exceptions (return None)
-        pass
+        if self.parent_context:
+            _execution_context.set(self.parent_context)
+        else:
+            _execution_context.set(None)
+
+        # Don't suppress exceptions - return None
 
     def emit(self, event_type: str, data: dict[str, Any] | None = None, **kwargs) -> None:
         """Emit event within this context.
@@ -233,10 +357,40 @@ class StreamllContext:
             data: Event data
             **kwargs: Additional event fields
         """
-        # Use this context's execution_id
-        # Add this context's metadata
-        # Delegate to global emit
-        pass
+        from streamll.models import generate_event_id
+
+        # Merge provided data with metadata and kwargs
+        event_data = {**self.metadata}
+        if data:
+            event_data.update(data)
+        event_data.update(kwargs)
+
+        # Create event using this context's execution_id
+        event = StreamllEvent(
+            event_id=generate_event_id(),
+            execution_id=self.execution_id,
+            timestamp=datetime.now(UTC),
+            event_type=event_type,
+            module_name=self.module_name,
+            method_name=self.operation,
+            operation=self.operation,
+            data=event_data,
+        )
+
+        # Emit to both local sinks and global sinks
+        emit_event(event)
+
+        # Also emit to local sinks if they exist
+        for sink in self.local_sinks:
+            if hasattr(sink, "is_running") and sink.is_running:
+                try:
+                    sink.handle_event(event)
+                except Exception as e:
+                    # Log but don't crash
+                    import logging
+
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"Local sink {type(sink).__name__} failed: {e}")
 
 
 # Convenience function for creating trace context

@@ -1,452 +1,182 @@
-"""RabbitMQ sink for streamll events using AMQP message queuing."""
+"""RabbitMQ sink for streaming events."""
 
 import asyncio
 import json
 import logging
-import time
-from queue import Queue
-from threading import Event, Thread
+from concurrent.futures import ThreadPoolExecutor
 
 from streamll.models import StreamllEvent
 from streamll.sinks.base import BaseSink
-from streamll.utils.circuit_breaker import CircuitBreaker
 
 logger = logging.getLogger(__name__)
 
 
 class RabbitMQSink(BaseSink):
-    """Publishes events to RabbitMQ with batching and circuit breaker."""
+    """Writes events to RabbitMQ with async support."""
 
     def __init__(
         self,
-        amqp_url: str = "amqp://guest:guest@localhost:5672/",
-        exchange: str = "streamll_events",
-        routing_key: str = "streamll.event",
-        queue_name: str | None = None,
-        durable: bool = True,
-        circuit_breaker: bool = True,
-        failure_threshold: int = 3,
-        recovery_timeout: float = 30.0,
-        max_retries: int = 3,
-        # Performance configurations (following Redis pipeline pattern)
-        publisher_confirms: bool = True,     # Reliability guarantee like Redis transactions
-        batch_size: int = 50,               # Message batching like Redis pipelines
-        batch_timeout: float = 0.1,         # Maximum batch wait time
-        confirm_timeout: float = 5.0,       # Publisher confirm wait time
-        use_streams: bool = False,          # RabbitMQ Streams for high throughput (future)
-        connection_pool_size: int = 5,      # Connection pooling (future)
-        **kwargs,
+        url: str = "amqp://guest:guest@localhost:5672/",
+        exchange: str = "streamll",
+        routing_key: str = "events",
+        buffer_size: int = 10000,
+        batch_size: int = 100,
     ):
-        super().__init__()
-        self.amqp_url = amqp_url
-        self.exchange_name = exchange
-        self.routing_key_template = routing_key
-        self.queue_name = queue_name
-        self.durable = durable
-        self.circuit_breaker_enabled = circuit_breaker
-        self.failure_threshold = failure_threshold
-        self.recovery_timeout = recovery_timeout
-        self.max_retries = max_retries
-        self.connection_kwargs = kwargs
+        """Initialize RabbitMQ sink.
 
-        # Performance configuration
-        self.publisher_confirms = publisher_confirms
-        self.batch_size = batch_size
-        self.batch_timeout = batch_timeout
-        self.confirm_timeout = confirm_timeout
-        self.use_streams = use_streams
-        self.connection_pool_size = connection_pool_size
+        Args:
+            url: RabbitMQ connection URL
+            exchange: Exchange name
+            routing_key: Routing key for messages
+            buffer_size: Maximum events to buffer
+            batch_size: Events per batch write
+        """
+        super().__init__(
+            buffer_size=buffer_size,
+            batch_size=batch_size,
+            flush_interval=1.0,
+            failure_threshold=3,
+            recovery_timeout=30.0,
+        )
 
-        # Runtime state
-        self.connection = None
-        self.channel = None
-        self.exchange = None
-        self.queue = None
-        self.event_queue = Queue()
-        self.worker_thread = None
+        self.url = url
+        self.exchange = exchange
+        self.routing_key = routing_key
 
-        # Circuit breaker for fault tolerance
-        if circuit_breaker:
-            self._circuit_breaker = CircuitBreaker(failure_threshold, recovery_timeout)
-        else:
-            self._circuit_breaker = None
-
-        # Synchronization for flush operations
-        self._flush_event = Event()
-
-        # Message batching state (similar to Redis pipeline)
-        self._message_batch = []
-        self._last_batch_time = None
+        # Async components
+        self._loop = None
+        self._executor = None
+        self._connection = None
+        self._channel = None
 
     def start(self) -> None:
-        """Start the RabbitMQ sink worker thread."""
-        if self.is_running:
-            return
+        """Start the RabbitMQ sink."""
+        super().start()
 
-        self.is_running = True
-        self.worker_thread = Thread(target=self._worker_loop, daemon=True)
-        self.worker_thread.start()
-        logger.info(f"RabbitMQ sink started (exchange={self.exchange_name})")
+        # Create event loop and executor
+        self._loop = asyncio.new_event_loop()
+        self._executor = ThreadPoolExecutor(max_workers=1)
+
+        # Connect in background
+        self._executor.submit(self._connect)
 
     def stop(self) -> None:
-        """Stop the RabbitMQ sink and close connections."""
-        if not self.is_running:
-            return
+        """Stop the sink and close connections."""
+        super().stop()
 
-        self.is_running = False
+        if self._executor:
+            # Close connection
+            if self._connection:
+                self._executor.submit(self._disconnect).result(timeout=5)
 
-        # Signal worker to stop
-        self.event_queue.put(None)
+            # Shutdown executor
+            self._executor.shutdown(wait=True)
 
-        if self.worker_thread and self.worker_thread.is_alive():
-            self.worker_thread.join(timeout=5.0)
+        if self._loop:
+            self._loop.close()
 
-        logger.info("RabbitMQ sink stopped")
-
-    def flush(self) -> None:
-        """Flush any buffered events immediately.
-
-        For RabbitMQ sink, events are processed by worker thread,
-        so we wait until the queue is actually empty.
-        """
-        if not self.is_running:
-            return
-
-        # Wait for queue to be empty with timeout
-        timeout = 5.0  # Maximum wait time
-        start_time = time.time()
-
-        while not self.event_queue.empty() and (time.time() - start_time) < timeout:
-            time.sleep(0.01)  # Small polling interval
-
-        # TODO: ARCHITECTURE CONSISTENCY - Still using sleep-based synchronization
-        # Redis sink uses proper atomic operations, consider Event-based signaling
-        # Give worker thread a moment to process the last event
-        if self.event_queue.empty():
-            time.sleep(0.05)
-
-    def handle_event(self, event: StreamllEvent) -> None:
-        """Queue event for async publishing to RabbitMQ."""
-        if not self.is_running:
-            return
-
-        if self._circuit_breaker and not self._circuit_breaker.should_attempt():
-            return
-
+    def _connect(self) -> None:
+        """Connect to RabbitMQ."""
         try:
-            self.event_queue.put(event)
-        except Exception as e:
-            logger.warning(f"Failed to queue event for RabbitMQ: {e}")
-
-    def _worker_loop(self) -> None:
-        """Main worker loop for processing events."""
-        import asyncio
-
-        # TODO: ARCHITECTURE CONSISTENCY - Creating new event loop per worker is resource-heavy
-        # Consider using shared event loop or asyncio.run() instead
-        # This pattern differs from Redis sink which doesn't use asyncio at all
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-        try:
-            loop.run_until_complete(self._async_worker())
-        except Exception as e:
-            # TODO: ARCHITECTURE CONSISTENCY - Error handling differs from Redis sink
-            # Redis sink has specific ConnectionError handling, this swallows all exceptions
-            logger.error(f"RabbitMQ worker error: {e}")
-        finally:
-            loop.close()
-
-    async def _async_worker(self) -> None:
-        """Async worker that processes events from queue."""
-        try:
-            import aio_pika  # noqa: F401
+            import aio_pika
         except ImportError:
-            logger.error("aio-pika not installed. Install with: pip install streamll[rabbitmq]")
+            logger.error(
+                "aio-pika not installed. Install with: pip install streamll[rabbitmq-producer]"
+            )
             return
 
-        # Initialize batch timing
-        if self._last_batch_time is None:
-            self._last_batch_time = time.time()
+        asyncio.set_event_loop(self._loop)
 
-        while self.is_running:
+        async def connect_async():
             try:
-                # Get event from queue with shorter timeout for batching
-                event = await asyncio.get_event_loop().run_in_executor(
-                    None, self._get_event_with_timeout, 0.01  # Short timeout for responsive batching
+                self._connection = await aio_pika.connect_robust(self.url)
+                self._channel = await self._connection.channel()
+
+                # Declare exchange
+                await self._channel.declare_exchange(
+                    self.exchange,
+                    aio_pika.ExchangeType.TOPIC,
+                    durable=True,
                 )
 
-                if event is None and not self.is_running:  # Shutdown signal
-                    break
-
-                # Ensure connection
-                if not await self._ensure_connection():
-                    continue
-
-                # Add event to batch or process timeout
-                if event is not None:
-                    self._message_batch.append(event)
-
-                # Check if batch should be published
-                should_publish = (
-                    len(self._message_batch) >= self.batch_size or  # Batch size reached
-                    (self._message_batch and
-                     time.time() - self._last_batch_time >= self.batch_timeout) or  # Timeout reached
-                    event is None  # No more events (timeout case)
-                )
-
-                if should_publish and self._message_batch:
-                    await self._publish_batch(self._message_batch)
-                    self._message_batch.clear()
-                    self._last_batch_time = time.time()
-
-                    # Reset failure count on successful batch
-                    if self._circuit_breaker:
-                        self._circuit_breaker.record_success()
-
+                logger.info(f"Connected to RabbitMQ at {self.url}")
             except Exception as e:
-                logger.warning(f"RabbitMQ worker error: {e}")
-                await self._handle_failure()
+                logger.error(f"Failed to connect to RabbitMQ: {e}")
 
-        # Cleanup
-        await self._cleanup_connection()
+        self._loop.run_until_complete(connect_async())
 
-    def _get_event_blocking(self) -> StreamllEvent | None:
-        """Get event from queue with timeout."""
-        while self.is_running:
-            try:
-                return self.event_queue.get(timeout=1.0)
-            except Exception:  # noqa: S112
-                # Continue loop if still running, timeout is expected
-                continue
-        return None
-
-    def _get_event_with_timeout(self, timeout: float) -> StreamllEvent | None:
-        """Get event from queue with specific timeout for batching."""
-        try:
-            return self.event_queue.get(timeout=timeout)
-        except Exception:
-            return None  # Timeout or queue empty
-
-    async def _ensure_connection(self) -> bool:
-        """Ensure RabbitMQ connection and setup exchange/queue."""
-        if self.connection and not self.connection.is_closed:
-            return True
-
-        try:
-            import aio_pika
-
-            # TODO: PERFORMANCE - Implement connection pooling like Redis connection reuse
-            # Current: Single connection per sink instance
-            # Optimized: Shared connection pool across multiple sinks
-            # Connect to RabbitMQ
-            self.connection = await aio_pika.connect_robust(
-                self.amqp_url,
-                **self.connection_kwargs
-            )
-
-            # Create channel
-            self.channel = await self.connection.channel()
-
-            # Enable publisher confirms for reliability (like Redis transactions)
-            # Note: aio-pika handles confirms automatically when enabled in connection
-            if self.publisher_confirms:
-                # Publisher confirms are handled by aio-pika's robust connection
-                logger.debug("Publisher confirms enabled via robust connection")
-
-            # Set QoS for memory control
-            await self.channel.set_qos(prefetch_count=self.batch_size * 2)
-
-            # Declare exchange
-            self.exchange = await self.channel.declare_exchange(
-                self.exchange_name,
-                aio_pika.ExchangeType.TOPIC,
-                durable=self.durable
-            )
-
-            # Optionally declare queue
-            if self.queue_name:
-                self.queue = await self.channel.declare_queue(
-                    self.queue_name,
-                    durable=self.durable
-                )
-
-                # Bind queue to exchange
-                await self.queue.bind(self.exchange, self.routing_key_template)
-
-            logger.info(f"Connected to RabbitMQ: {self.exchange_name}")
-            return True
-
-        except Exception as e:
-            logger.warning(f"Failed to connect to RabbitMQ: {e}")
-            return False
-
-    async def _publish_event(self, event: StreamllEvent) -> None:
-        """Publish event to RabbitMQ exchange."""
-        try:
-            import aio_pika
-
-            # Serialize event
-            message_body = json.dumps({
-                "event_id": event.event_id,
-                "execution_id": event.execution_id,
-                "timestamp": event.timestamp.isoformat(),
-                "module_name": event.module_name,
-                "method_name": event.method_name,
-                "event_type": event.event_type,
-                "operation": event.operation,
-                "data": event.data,
-                "tags": event.tags,
-            }).encode()
-
-            # Generate routing key from template
-            routing_key = self._generate_routing_key(event)
-
-            # Create message
-            message = aio_pika.Message(
-                message_body,
-                content_type="application/json",
-                headers={
-                    "streamll_version": "0.1.0",
-                    "event_type": event.event_type,
-                    "operation": event.operation or "unknown",
-                    "module_name": event.module_name,
-                },
-                delivery_mode=aio_pika.DeliveryMode.PERSISTENT if self.durable else aio_pika.DeliveryMode.NOT_PERSISTENT
-            )
-
-            # TODO: PERFORMANCE - Implement message batching similar to Redis pipelines
-            # Current: Individual publish (like Redis individual XADD)
-            # Optimized: Batch multiple messages with publisher confirms
-            # See docs/rabbitmq-performance-guide.md for implementation patterns
-
-            # Publish with retries
-            for attempt in range(self.max_retries + 1):
-                try:
-                    await self.exchange.publish(message, routing_key=routing_key)
-                    # TODO: PERFORMANCE - Add publisher confirms for reliability
-                    # await self.channel.wait_for_confirms(timeout=confirm_timeout)
-                    return
-                except Exception:
-                    if attempt == self.max_retries:
-                        raise
-                    await asyncio.sleep(0.1 * (2 ** attempt))  # Exponential backoff
-
-        except Exception as e:
-            logger.warning(f"Failed to publish event to RabbitMQ: {e}")
-            raise
-
-    async def _publish_batch(self, events: list[StreamllEvent]) -> None:
-        """Publish batch of events to RabbitMQ (similar to Redis pipeline).
-
-        This provides the same performance benefits as Redis pipelines by:
-        1. Reducing network round trips
-        2. Batching publisher confirms
-        3. Amortizing connection overhead
-        """
-        if not events:
+    def _disconnect(self) -> None:
+        """Disconnect from RabbitMQ."""
+        if not self._connection:
             return
 
-        try:
+        async def disconnect_async():
+            try:
+                await self._connection.close()
+                logger.info("Closed RabbitMQ connection")
+            except Exception as e:
+                logger.error(f"Error closing RabbitMQ connection: {e}")
+
+        self._loop.run_until_complete(disconnect_async())
+
+    def _write_batch(self, events: list[StreamllEvent]) -> None:
+        """Write batch of events to RabbitMQ.
+
+        Args:
+            events: Events to write
+
+        Raises:
+            Exception: If write fails
+        """
+        if not self._channel:
+            raise RuntimeError("RabbitMQ channel not initialized")
+
+        async def publish_async():
             import aio_pika
 
-            # Prepare all messages in batch
-            messages_to_publish = []
+            # Publish each event
             for event in events:
                 # Serialize event
-                message_body = json.dumps({
-                    "event_id": event.event_id,
-                    "execution_id": event.execution_id,
-                    "timestamp": event.timestamp.isoformat(),
-                    "module_name": event.module_name,
-                    "method_name": event.method_name,
-                    "event_type": event.event_type,
-                    "operation": event.operation,
-                    "data": event.data,
-                    "tags": event.tags,
-                }).encode()
+                event_dict = event.model_dump()
+                if "timestamp" in event_dict:
+                    event_dict["timestamp"] = event_dict["timestamp"].isoformat()
 
-                # Generate routing key
-                routing_key = self._generate_routing_key(event)
-
-                # Create message
                 message = aio_pika.Message(
-                    message_body,
+                    body=json.dumps(event_dict).encode(),
                     content_type="application/json",
-                    headers={
-                        "streamll_version": "0.1.0",
-                        "event_type": event.event_type,
-                        "operation": event.operation or "unknown",
-                        "module_name": event.module_name,
-                        "batch_size": len(events),
-                    },
-                    delivery_mode=aio_pika.DeliveryMode.PERSISTENT if self.durable else aio_pika.DeliveryMode.NOT_PERSISTENT
+                    delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
                 )
 
-                messages_to_publish.append((message, routing_key))
+                # Publish to exchange
+                exchange = await self._channel.get_exchange(self.exchange)
+                await exchange.publish(message, routing_key=self.routing_key)
 
-            # Publish all messages in batch (similar to Redis pipeline execute)
-            publish_tasks = []
-            for message, routing_key in messages_to_publish:
-                task = self.exchange.publish(message, routing_key=routing_key)
-                publish_tasks.append(task)
+            logger.debug(f"Published {len(events)} events to RabbitMQ")
 
-            # Execute all publishes concurrently
-            await asyncio.gather(*publish_tasks)
+        # Run async publish in executor
+        future = self._executor.submit(self._loop.run_until_complete, publish_async())
+        future.result(timeout=10)  # Wait for completion
 
-            # Wait for publisher confirms if enabled (like Redis transaction commit)
-            if self.publisher_confirms:
-                # aio-pika robust connection handles confirms automatically
-                # Small delay to ensure message persistence
-                await asyncio.sleep(0.01)
+    def declare_queue(self, queue_name: str, routing_keys: list[str] | None = None) -> None:
+        """Declare a queue and bind it to the exchange.
 
-            logger.debug(f"Published batch of {len(events)} events to RabbitMQ")
+        Args:
+            queue_name: Name of the queue
+            routing_keys: List of routing keys to bind
+        """
+        if not self._channel:
+            logger.error("Cannot declare queue: not connected")
+            return
 
-        except Exception as e:
-            logger.warning(f"Failed to publish batch to RabbitMQ: {e}")
-            raise
+        async def declare_async():
+            # Declare queue
+            queue = await self._channel.declare_queue(queue_name, durable=True)
 
-    def _generate_routing_key(self, event: StreamllEvent) -> str:
-        """Generate routing key from template using event fields."""
-        try:
-            return self.routing_key_template.format(
-                event_type=event.event_type,
-                operation=event.operation or "unknown",
-                module_name=event.module_name.replace(".", "_"),
-                method_name=event.method_name,
-                execution_id=event.execution_id[:8],  # Short ID
-            )
-        except KeyError:
-            # Fallback if template has unknown fields
-            return f"streamll.{event.event_type}.{event.operation or 'unknown'}"
+            # Bind to exchange
+            exchange = await self._channel.get_exchange(self.exchange)
+            for key in routing_keys or [self.routing_key]:
+                await queue.bind(exchange, routing_key=key)
 
-    async def _handle_failure(self) -> None:
-        """Handle connection/publish failures with circuit breaker."""
-        if self._circuit_breaker:
-            self._circuit_breaker.record_failure()
+            logger.info(f"Declared queue {queue_name} with keys {routing_keys}")
 
-        # Close broken connection
-        await self._cleanup_connection()
-
-
-    async def _cleanup_connection(self) -> None:
-        """Clean up RabbitMQ connection and channel."""
-        try:
-            if self.channel and not self.channel.is_closed:
-                await self.channel.close()
-            if self.connection and not self.connection.is_closed:
-                await self.connection.close()
-        except Exception as e:
-            # TODO: ARCHITECTURE CONSISTENCY - Should log cleanup errors like Redis sink does
-            # Redis sink: logger.error(f"Error closing Redis connection: {e}")
-            logger.debug(f"RabbitMQ cleanup error (non-critical): {e}")
-        finally:
-            self.connection = None
-            self.channel = None
-            self.exchange = None
-            self.queue = None
-
-    @property
-    def failures(self) -> int:
-        """Get current failure count for monitoring and testing."""
-        return self._circuit_breaker.failure_count if self._circuit_breaker else 0
+        self._executor.submit(self._loop.run_until_complete, declare_async()).result(timeout=5)

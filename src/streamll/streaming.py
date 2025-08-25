@@ -6,6 +6,7 @@ Provides real-time streaming capabilities for DSPy modules with StreamLL observa
 
 import logging
 from collections.abc import Callable
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -223,4 +224,152 @@ def create_multi_field_streaming_wrapper(
     )
 
 
-__all__ = ["create_streaming_wrapper", "create_multi_field_streaming_wrapper"]
+def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str]) -> Callable:
+    """Wrap a forward method to enable token streaming.
+
+    This function is used by the @instrument decorator to wrap forward methods
+    for token streaming when stream_fields are specified.
+
+    Since DSPy's streamify expects Module objects (not lambdas), we intercept
+    and wrap the Predict modules within the forward method.
+
+    Args:
+        forward_method: The original forward method
+        module_instance: The module instance being wrapped
+        stream_fields: List of field names to stream
+
+    Returns:
+        Wrapped forward method that emits TokenEvents
+    """
+    from streamll.context import emit_event, get_execution_id
+    from streamll.models import StreamllEvent, generate_event_id
+
+    try:
+        import dspy
+        from dspy.streaming import StreamListener, StreamResponse, streamify
+    except ImportError as e:
+        logger.warning(f"DSPy streaming not available: {e}")
+        # Return unwrapped method if streaming not available
+        return forward_method
+
+    def streaming_forward(*args, **kwargs):
+        """Execute forward with streaming and emit TokenEvents."""
+
+        # Find all Predict modules in the instance
+        predictors = []
+        for name, attr in module_instance.__dict__.items():
+            if isinstance(attr, dspy.Predict):
+                predictors.append((name, attr, None))  # (name, predictor, parent)
+            elif isinstance(attr, dspy.ChainOfThought):
+                # ChainOfThought has an internal 'predict' attribute
+                if hasattr(attr, "predict") and isinstance(attr.predict, dspy.Predict):
+                    # Add the internal predict with parent reference
+                    predictors.append(
+                        ("predict", attr.predict, attr)
+                    )  # (attr_name, predictor, parent)
+
+        if not predictors:
+            # No predictors to stream, just call normally
+            logger.debug(f"No predictors found in {module_instance.__class__.__name__}")
+            return forward_method(*args, **kwargs)
+
+        # Store original predictors and wrap them
+        original_predictors = []
+        for predictor_name, predictor, parent in predictors:
+            # Check if this predictor has fields we want to stream
+            try:
+                output_fields = predictor.signature.output_fields
+                fields_to_stream = [f for f in stream_fields if f in output_fields]
+
+                if not fields_to_stream:
+                    continue
+
+                # Store original with parent info
+                original_predictors.append((predictor_name, predictor, parent))
+
+                # Track token indices per field
+                token_indices = {field: 0 for field in fields_to_stream}
+
+                # Create listeners
+                listeners = [
+                    StreamListener(signature_field_name=field) for field in fields_to_stream
+                ]
+
+                # Wrap with streamify
+                stream_predictor = streamify(
+                    predictor,
+                    stream_listeners=listeners,
+                    async_streaming=False,
+                    include_final_prediction_in_output_stream=True,
+                )
+
+                # Create wrapper that processes stream
+                def make_streaming_wrapper(pred_name, indices):
+                    def streaming_predict(*pred_args, **pred_kwargs):
+                        result = None
+                        stream_output = stream_predictor(*pred_args, **pred_kwargs)
+
+                        for chunk in stream_output:
+                            if isinstance(chunk, StreamResponse):
+                                field_name = chunk.signature_field_name
+
+                                if field_name in indices:
+                                    event = StreamllEvent(
+                                        event_id=generate_event_id(),
+                                        execution_id=get_execution_id(),
+                                        timestamp=datetime.now(UTC),
+                                        module_name=module_instance.__class__.__name__,
+                                        method_name=pred_name,
+                                        event_type="token",
+                                        data={
+                                            "field": field_name,
+                                            "token": chunk.chunk,
+                                            "token_index": indices[field_name],
+                                        },
+                                    )
+                                    emit_event(event, module_instance)
+                                    indices[field_name] += 1
+
+                            elif isinstance(chunk, dspy.Prediction):
+                                result = chunk
+
+                        return result
+
+                    return streaming_predict
+
+                # Replace predictor with streaming version
+                wrapper = make_streaming_wrapper(predictor_name, token_indices)
+                if parent is not None:
+                    # This is from ChainOfThought, set on parent
+                    setattr(parent, predictor_name, wrapper)
+                else:
+                    # This is a direct Predict on module
+                    setattr(module_instance, predictor_name, wrapper)
+
+            except (AttributeError, Exception) as e:
+                logger.debug(f"Could not wrap predictor {predictor_name}: {e}")
+                continue
+
+        try:
+            # Call forward with wrapped predictors
+            result = forward_method(*args, **kwargs)
+        finally:
+            # Restore original predictors
+            for name, original, parent in original_predictors:
+                if parent is not None:
+                    # Restore on parent (ChainOfThought)
+                    setattr(parent, name, original)
+                else:
+                    # Restore on module
+                    setattr(module_instance, name, original)
+
+        return result
+
+    return streaming_forward
+
+
+__all__ = [
+    "create_streaming_wrapper",
+    "create_multi_field_streaming_wrapper",
+    "wrap_with_streaming",
+]

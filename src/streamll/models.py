@@ -12,6 +12,11 @@ from nanoid import generate
 from pydantic import AwareDatetime, BaseModel, Field
 
 
+def generate_event_id() -> str:
+    """Generate a unique event ID."""
+    return generate(size=12)
+
+
 class StreamllEvent(BaseModel):
     """Unified event model for all streamll events.
 
@@ -31,14 +36,6 @@ class StreamllEvent(BaseModel):
     # Source context
     module_name: str = Field(default="unknown", description="DSPy module or user-defined")
     method_name: str = Field(default="forward", description="Method being executed")
-
-    # Version tracking for detecting code changes
-    module_version: str | None = Field(
-        default=None, description="AST hash of module forward() method"
-    )
-    code_signature: str | None = Field(
-        default=None, description="Additional signature for version tracking"
-    )
 
     # Event semantics
     event_type: str = Field(description="start, end, token, error")
