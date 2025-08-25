@@ -15,11 +15,10 @@ from streamll.dspy_callback import StreamllDSPyCallback
 def instrument(
     cls: type[dspy.Module] | None = None,
     *,
-    operations: list[str] | None = None,
     sinks: list[Any] | None = None,
     include_inputs: bool = True,
     include_outputs: bool = True,
-    event_filter: set[str] | None = None,
+    stream_fields: list[str] | None = None,
 ) -> Callable | type[dspy.Module]:
     """Decorator to instrument DSPy modules with streamll events.
 
@@ -27,11 +26,11 @@ def instrument(
 
     Args:
         cls: The class being decorated (when used without parens)
-        operations: List of operation names to track (None = all)
         sinks: Additional sinks for this module only
         include_inputs: Whether to include inputs in events
         include_outputs: Whether to include outputs in events
-        event_filter: Set of event types to emit
+        stream_fields: Optional list of string field names to stream token-by-token.
+                      When specified, TokenEvents will be emitted for these fields.
 
     Returns:
         Decorated class or decorator function
@@ -42,7 +41,7 @@ def instrument(
             def forward(self, x):
                 return self.predict(x)
 
-        @streamll.instrument(operations=["retrieval"], include_outputs=False)
+        @streamll.instrument(include_outputs=False)
         class SecureModule(dspy.Module):
             def forward(self, query):
                 return self.retrieve(query)
@@ -90,7 +89,6 @@ def instrument(
 
             # Create streamll callback with decorator parameters
             streamll_callback = StreamllDSPyCallback(
-                event_filter=event_filter,
                 include_inputs=include_inputs,
                 include_outputs=include_outputs,
             )
@@ -123,15 +121,18 @@ def instrument(
             # Store instance reference for sink routing
             streamll_callback._module_instance = self
 
+            # Store streaming configuration
+            self._streamll_stream_fields = stream_fields or []
+
+            # Wrap forward method if streaming enabled
+            if stream_fields and hasattr(self, "forward"):
+                from streamll.streaming import wrap_with_streaming
+
+                original_forward = self.forward
+                self.forward = wrap_with_streaming(original_forward, self, stream_fields)
+
         # Replace __init__ with wrapped version
         cls.__init__ = wrapped_init
-
-        # Optionally wrap forward() for additional control
-        # But DSPy callbacks should handle most cases
-        if operations:
-            # Could add filtering logic here
-            # Store operations list for callback to check
-            cls._streamll_operations = operations
 
         return cls
 

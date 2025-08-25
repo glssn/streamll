@@ -1,135 +1,127 @@
 # StreamLL Development Guide
 
 ## Project Overview
-StreamLL is a production observability tool for DSPy applications, providing streaming infrastructure for real-time event monitoring with Redis, RabbitMQ, and Terminal sinks.
+StreamLL provides real-time observability for DSPy applications through the `@streamll.instrument` decorator and `streamll.trace()` context manager, with production sinks for Redis, RabbitMQ, and Terminal output.
 
-## Development Philosophy: The Diamond Approach
+## Core Philosophy: Less is More
 
-### Priority Hierarchy (ALWAYS follow this order)
-1. **Data integrity bugs first** - Event loss, corruption, inconsistent state
-2. **Reliability issues** - Stack overflows, connection failures, resource leaks  
-3. **Architecture consistency** - Sync vs async patterns, time sources, error handling
-4. **Test infrastructure** - Fixtures, URLs, CI improvements
+### The 92% Rule
+We successfully reduced this codebase from 11,500 to 900 lines (92% reduction) while **improving** functionality. Always ask:
+- "Do we really need this?"
+- "Can we achieve the same with less?"
+- "Is this solving a real problem or a hypothetical one?"
 
-**Rule**: If you find yourself fixing test infrastructure instead of actual bugs, that's a red flag. Step back and ask: "What's the core problem here?"
+### Priority Hierarchy (NEVER compromise on these)
+1. **Core features must work** - `@streamll.instrument` decorator is THE core feature
+2. **Clear naming** - No apologetic names (not "SimpleTerminalSink", just "TerminalSink")
+3. **Essential complexity only** - If it takes 400 lines, try 40
+4. **Real tests over infrastructure** - 26 working tests > 100 broken fixtures
 
-### Test-Driven Bug Fixing Protocol
+## Critical Features (These MUST Always Work)
 
-For every bug fix:
-1. **Reproduce First**: Write a failing test that demonstrates the exact problem
-2. **Identify Root Cause**: Don't treat symptoms - find the actual source
-3. **Fix Precisely**: Change only what's necessary to fix the root cause
-4. **Verify Completely**: Ensure the test passes and patterns are consistent
-5. **Document Impact**: Explain what this fix prevents in production
-
-**Example Structure**:
+### 1. The Decorator
 ```python
-def test_redis_data_loss_bug(self):
-    """Test that reproduces the data loss bug when Redis fails mid-flush.
-    
-    Bug location: src/streamll/sinks/redis.py:256-267
-    Bug: Events were removed from buffer before ensuring Redis write success
-    Expected behavior: Events should only be removed AFTER successful write
-    """
-    # Setup that reproduces the exact scenario
-    # Assertions that fail due to the bug
-    # Comments explaining why this matters in production
+@streamll.instrument
+class MyModule(dspy.Module):
+    def forward(self, x):
+        return self.predict(x)
+```
+This is why users choose StreamLL. If this breaks, nothing else matters.
+
+### 2. The Trace Context
+```python
+with streamll.trace("operation") as ctx:
+    # Automatic start/end/error events
+    ctx.emit("custom", data={"key": "value"})
 ```
 
-### Red Flags (Stop and reconsider when you catch yourself doing these)
+### 3. Production Sinks
+- **TerminalSink**: For development (not "SimpleTerm..." or "BasicTerm...")
+- **RedisSink**: For production with buffering
+- **RabbitMQSink**: For message queue integration
 
-❌ **The Patch Cycle**:
-- "Let me just quickly fix this URL..."
-- Making sync things async (or vice versa) to make tests pass
-- Adding sleeps or timeouts to handle race conditions  
-- Swallowing exceptions "just to make it work"
-- Modifying test fixtures instead of fixing the actual code
+## Red Flags (Stop immediately if you catch yourself)
 
-❌ **Symptom Treatment**:
-- Changing error messages instead of fixing errors
-- Adding retries without understanding why things fail
-- "This works in my environment" without checking why it fails elsewhere
+❌ **Over-Engineering**:
+- Writing 400+ line files for simple features
+- Adding "version tracking" or "AST hashing" to a 0.1 project
+- Creating abstractions for single use cases
+- Parameterizing everything (Redis sink needs 3 params, not 16)
 
-✅ **Diamond Standard**:
-- Write the failing test first
-- Understand the failure completely before fixing
-- Fix affects the minimum necessary code
-- Resulting code is more reliable than before
-- Patterns are consistent across the codebase
+❌ **Naming Crimes**:
+- Apologetic names ("Simple", "Basic", "Minimal")
+- Redundant suffixes ("StreamllEvent" in streamll package)
+- Inconsistent patterns (some async, some sync without reason)
 
-### StreamLL-Specific Patterns
+❌ **Documentation Bloat**:
+- 7,800 lines of docs for 900 lines of code is insane
+- Examples that don't run
+- Planning documents in the repo (JIRA.md, ROADMAP.md)
 
-#### Error Handling
-- **Circuit Breaker Pattern**: Use consistent time sources (`time.time()` throughout)
-- **Connection Resilience**: Always have fallback mechanisms
-- **Event Buffering**: Never lose events - buffer locally when sinks are unavailable
+## The Right Way
 
-#### Performance
-- **Redis**: Use pipelines for batch operations (82x speedup achieved)
-- **RabbitMQ**: See `docs/rabbitmq-performance-guide.md` for batching, publisher confirms, and streams
-- **Buffering**: Configurable buffer sizes with overflow strategies
+### When Adding Features
+1. **Start with "No"** - Default to not adding it
+2. **Prove the need** - Real user request or actual bug
+3. **Implement minimally** - Shortest path to working
+4. **Test simply** - One clear test that shows it works
+5. **Document briefly** - One example in README
 
-#### Testing
-- **Integration Tests**: Require actual infrastructure (Redis, RabbitMQ)  
-- **Unit Tests**: Mock only external dependencies, not internal logic
-- **Bug Tests**: Every bug gets a regression test that reproduces the exact scenario
+### When Fixing Bugs
+1. **Reproduce first** - Failing test before any fix
+2. **Fix root cause** - Not symptoms
+3. **Keep fix minimal** - Don't refactor the world
+4. **Verify completely** - Test passes, examples work
 
-### Architecture Decisions
+### When Refactoring
+**DON'T** - Unless you can delete 50%+ of the code
 
-#### Sink Pattern
-All sinks follow `BaseSink` interface:
-- `start()` - Initialize connections/threads
-- `stop()` - Graceful shutdown with event flushing
-- `handle_event()` - Fast, non-blocking event processing
-- `flush()` - Synchronous guarantee that events are processed
+## Code Standards
 
-#### Event Flow
+### Structure
 ```
-DSPy Application → StreamllEvent → Sink.handle_event() → Buffer → Background Processing → External System
+src/streamll/
+  __init__.py       # Public API (minimal exports)
+  decorator.py      # @instrument (< 150 lines)
+  context.py        # trace() context (< 200 lines)
+  streaming.py      # Token streaming logic
+  models.py         # Single event model (< 50 lines)
+  sinks/
+    base.py         # BaseSink with buffering/circuit breaker
+    terminal.py     # TerminalSink (< 100 lines)
+    redis.py        # RedisSink (< 150 lines)
+    rabbitmq.py     # RabbitMQSink (< 200 lines)
 ```
 
-#### Dependencies
-- **DSPy**: `>=2.6.24,<4.0.0` (minimum for streaming features)
-- **Redis**: `>=4.5.4,<7.0.0` (security fixes + compatibility)  
-- **RabbitMQ**: `aio-pika>=5.0.0,<10.0.0` (async support)
-
-### Task Management
-Use TodoWrite tool to maintain discipline:
-- Break complex tasks into specific, testable steps
-- Mark tasks in_progress before starting work
-- Complete tasks immediately when finished
-- Focus on one task at a time
-
-### Code Quality Standards
-
-#### Comments
-- No implementation comments unless documenting complex algorithms
-- TODO/BUG comments must include specific next actions
-- Docstrings for all public methods with examples
-
-#### Logging  
-- `logger.debug()` - Development/troubleshooting info
-- `logger.info()` - Important operational events  
-- `logger.warning()` - Recoverable issues (circuit breaker, retries)
-- `logger.error()` - Serious problems that need investigation
-
-#### Testing Commands
+### Testing
 ```bash
-# Run all tests
+# Run all tests - they should ALL pass
 uv run pytest
 
-# Run specific sink tests
-uv run pytest tests/sinks/test_redis_sink.py -m redis
+# With environment variables for integration tests
+uv run --env-file /path/to/.env pytest
 
-# Run integration tests (requires infrastructure)
-uv run pytest -m integration
-
-# Run without coverage for speed during development
+# Quick check without coverage
 uv run pytest --no-cov
 ```
 
-## Remember: Good Architecture ≠ Perfect Code From Day 1
+### Examples Must Work
+Every example in `examples/` must:
+- Run without errors
+- Use OpenRouter or Gemini (not OpenAI with quotas)
+- Show a real use case
+- Be under 150 lines
 
-Good architecture is about **maintaining discipline when things get messy**. The codebase started with good patterns - stick to them even when it's harder.
+## Task Management
+When working on multiple items, use TodoWrite to track:
+- One task in_progress at a time
+- Mark complete immediately when done
+- Delete tasks that become irrelevant
 
-**Focus priority**: Reliable first, then consistent, then fast.
+## Final Rule: Protect the Core
+
+The decorator and trace context are why StreamLL exists. Everything else is secondary. If a change might break these, it's not worth it.
+
+Remember: We deleted 92% of the code and the library got BETTER. When in doubt, delete.
+
+**Focus**: Working code > Perfect architecture > Comprehensive docs

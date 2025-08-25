@@ -10,6 +10,7 @@ import redis
 from streamll.models import StreamllEvent
 from streamll.sinks.rabbitmq import RabbitMQSink
 from streamll.sinks.redis import RedisSink
+
 try:
     from streamll.sinks.kafka import KafkaSink
 except ImportError:
@@ -38,7 +39,7 @@ class IntegrationTestBase:
             StreamllEvent with predictable, verifiable properties
         """
         return StreamllEvent(
-            event_id=event_id or f"test-{int(time.time()*1000)}",
+            event_id=event_id or f"test-{int(time.time() * 1000)}",
             execution_id="test-execution-001",
             module_name="test.module",
             method_name="test_method",
@@ -46,7 +47,7 @@ class IntegrationTestBase:
             operation="test_operation",
             data=data or {"test": "integration_data", "timestamp": time.time()},
             tags={"environment": "test", "type": "integration"},
-            timestamp=datetime.now(UTC)
+            timestamp=datetime.now(UTC),
         )
 
     @staticmethod
@@ -103,30 +104,31 @@ def rabbitmq_url():
 @pytest.fixture(scope="session")
 def test_redis_sink(redis_client):
     """Redis sink factory for integration tests."""
+
     def _create_redis_sink(stream_key: str | None = None, **kwargs):
         """Create Redis sink with test configuration."""
         if stream_key is None:
-            stream_key = f"test_stream_{int(time.time()*1000)}"
+            stream_key = f"test_stream_{int(time.time() * 1000)}"
 
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
         sink = RedisSink(
-            url=redis_url,
-            stream_key=stream_key,
-            buffer_size=1000,
-            max_batch_size=100,
-            **kwargs
+            url=redis_url, stream_key=stream_key, buffer_size=1000, max_batch_size=100, **kwargs
         )
         return sink
+
     return _create_redis_sink
 
 
 @pytest.fixture(scope="session")
 def test_rabbitmq_sink(rabbitmq_url):
     """RabbitMQ sink factory for integration tests."""
-    def _create_rabbitmq_sink(exchange: str | None = None, routing_key: str | None = None, **kwargs):
+
+    def _create_rabbitmq_sink(
+        exchange: str | None = None, routing_key: str | None = None, **kwargs
+    ):
         """Create RabbitMQ sink with test configuration."""
         if exchange is None:
-            exchange = f"test_exchange_{int(time.time()*1000)}"
+            exchange = f"test_exchange_{int(time.time() * 1000)}"
         if routing_key is None:
             routing_key = "test.{event_type}.{operation}"
 
@@ -138,9 +140,10 @@ def test_rabbitmq_sink(rabbitmq_url):
             circuit_breaker=True,
             failure_threshold=3,
             recovery_timeout=1.0,  # Fast recovery for tests
-            **kwargs
+            **kwargs,
         )
         return sink
+
     return _create_rabbitmq_sink
 
 
@@ -155,11 +158,11 @@ def test_kafka_sink(kafka_url):
     """Kafka sink factory for integration tests."""
     if KafkaSink is None:
         pytest.skip("Kafka sink not available (aiokafka not installed)")
-    
+
     def _create_kafka_sink(topic: str | None = None, **kwargs):
         """Create Kafka sink with test configuration."""
         if topic is None:
-            topic = f"test_topic_{int(time.time()*1000)}"
+            topic = f"test_topic_{int(time.time() * 1000)}"
 
         sink = KafkaSink(
             bootstrap_servers=kafka_url,
@@ -169,9 +172,10 @@ def test_kafka_sink(kafka_url):
             recovery_timeout=1.0,  # Fast recovery for tests
             batch_size=10,  # Small batch for faster tests
             batch_timeout_ms=100,
-            **kwargs
+            **kwargs,
         )
         return sink
+
     return _create_kafka_sink
 
 
@@ -181,9 +185,5 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "integration: Integration tests requiring real infrastructure"
     )
-    config.addinivalue_line(
-        "markers", "performance: Performance and benchmark tests"
-    )
-    config.addinivalue_line(
-        "markers", "slow: Slow tests that take >5 seconds"
-    )
+    config.addinivalue_line("markers", "performance: Performance and benchmark tests")
+    config.addinivalue_line("markers", "slow: Slow tests that take >5 seconds")
