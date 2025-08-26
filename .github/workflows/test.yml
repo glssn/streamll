@@ -34,11 +34,11 @@ jobs:
       - name: Install project in editable mode
         run: uv pip install -e .
 
+      - name: Create .env file
+        run: echo "${{ secrets.ENV_FILE }}" > .env
+        
       - name: Run unit tests
-        run: uv run pytest -m "not (redis or rabbitmq)" --cov=src/streamll
-        env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: uv run --env-file .env pytest -m "not (redis or rabbitmq)" --cov=src/streamll
 
       - name: Run linting
         run: uv run ruff check .
@@ -69,6 +69,9 @@ jobs:
       - name: Install project in editable mode
         run: uv pip install -e .
 
+      - name: Create .env file
+        run: echo "${{ secrets.ENV_FILE }}" > .env
+
       - name: Start test infrastructure
         run: docker compose -f .github/docker-compose.test.yml up -d redis rabbitmq
 
@@ -85,7 +88,7 @@ jobs:
         run: |
           export REDIS_URL="redis://localhost:6379"
           export RABBITMQ_URL="amqp://streamll_test:streamll_test@localhost:5672/streamll"
-          uv run pytest -m "redis or rabbitmq" -v
+          uv run --env-file .env pytest -m "redis or rabbitmq" -v
 
       - name: Stop test infrastructure
         if: always()
