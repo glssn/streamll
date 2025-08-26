@@ -26,6 +26,19 @@ from streamll.models import StreamllEvent
 from streamll.sinks.base import BaseSink
 
 
+@pytest.fixture(autouse=True)
+def reset_dspy():
+    """Reset DSPy state between tests."""
+    import dspy
+    # Clear all global state
+    dspy.configure()
+    dspy.settings.configure()
+    yield
+    # Clean up after test
+    dspy.configure()
+    dspy.settings.configure()
+
+
 class TokenCollectorSink(BaseSink):
     """Sink that specifically captures token events."""
 
@@ -74,9 +87,9 @@ class TokenCollectorSink(BaseSink):
 def test_token_streaming_with_openrouter():
     """Test token-by-token streaming with OpenRouter models."""
     import dspy
-
-    # Configure DSPy with OpenRouter
-    lm = dspy.LM("openrouter/deepseek/deepseek-chat", max_tokens=50)
+    
+    # Configure DSPy with OpenRouter - use DeepSeek which streams well
+    lm = dspy.LM("openrouter/deepseek/deepseek-chat", max_tokens=50, cache=False)
     dspy.configure(lm=lm)
 
     # Set up token collector
@@ -94,7 +107,7 @@ def test_token_streaming_with_openrouter():
 
     # Run with a question that should generate multiple tokens
     module = TokenTestModule()
-    module("Count from 1 to 5, one number per line.")
+    module("Tell me about cats")
 
     collector.stop()
 
@@ -119,8 +132,8 @@ def test_token_streaming_with_openrouter():
 def test_multi_field_streaming():
     """Test streaming multiple fields (reasoning + answer)."""
     import dspy
-
-    lm = dspy.LM("openrouter/deepseek/deepseek-chat", max_tokens=100)
+    
+    lm = dspy.LM("openrouter/deepseek/deepseek-chat", max_tokens=100, cache=False)
     dspy.configure(lm=lm)
 
     collector = TokenCollectorSink()
@@ -136,7 +149,7 @@ def test_multi_field_streaming():
             return self.cot(question=question)
 
     module = CoTModule()
-    module("What is 2+2? Think step by step.")
+    module("What are dogs?")
 
     collector.stop()
 

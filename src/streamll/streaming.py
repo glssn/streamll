@@ -246,7 +246,8 @@ def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str
 
     try:
         import dspy
-        from dspy.streaming import StreamListener, StreamResponse, streamify
+        from dspy.streaming import StreamListener, streamify
+        from dspy.streaming.messages import StreamResponse
     except ImportError as e:
         logger.warning(f"DSPy streaming not available: {e}")
         # Return unwrapped method if streaming not available
@@ -270,7 +271,6 @@ def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str
 
         if not predictors:
             # No predictors to stream, just call normally
-            logger.debug(f"No predictors found in {module_instance.__class__.__name__}")
             return forward_method(*args, **kwargs)
 
         # Store original predictors and wrap them
@@ -308,7 +308,7 @@ def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str
                     def streaming_predict(*pred_args, **pred_kwargs):
                         result = None
                         stream_output = stream_predictor(*pred_args, **pred_kwargs)
-
+                        
                         for chunk in stream_output:
                             if isinstance(chunk, StreamResponse):
                                 field_name = chunk.signature_field_name
@@ -347,7 +347,7 @@ def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str
                     setattr(module_instance, predictor_name, wrapper)
 
             except (AttributeError, Exception) as e:
-                logger.debug(f"Could not wrap predictor {predictor_name}: {e}")
+                logger.warning(f"Could not wrap predictor {predictor_name}: {e}")
                 continue
 
         try:
