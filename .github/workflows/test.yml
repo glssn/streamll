@@ -40,7 +40,6 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
 
       - name: Run linting
         run: uv run ruff check .
@@ -92,7 +91,6 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
 
       - name: Stop test infrastructure
         if: always()

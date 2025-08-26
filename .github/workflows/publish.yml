@@ -25,11 +25,8 @@ jobs:
           enable-cache: true
 
       - name: Build package
-        run: uv build
+        run: uv build --no-sources
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          # Use PyPI trusted publishers (recommended)
-          # OR use token authentication by uncommenting below:
-          # password: ${{ secrets.PYPI_TOKEN }}
+        # Uses PyPI trusted publishers - no token needed
