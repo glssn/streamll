@@ -34,10 +34,10 @@ class TestExamples:
         assert result.returncode == 0, \
             f"basic.py failed with:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
         
-        # Verify expected output patterns
-        assert "StreamLL Basic Example" in result.stdout or \
+        # Verify expected output patterns (StreamLL events)
+        assert ("START" in result.stdout and "END" in result.stdout) or \
                "event" in result.stdout.lower(), \
-            "basic.py should produce some output about events"
+            f"basic.py should produce StreamLL events. Got: {result.stdout[:200]}..."
     
     def test_examples_use_streamll(self, examples_dir):
         """Verify all examples import streamll."""
