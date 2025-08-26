@@ -18,7 +18,7 @@ class FileSink(BaseSink):
 
     def start(self):
         self.is_running = True
-        self.file = open(self.filename, "a")
+        self.file = open(self.filename, "a")  # noqa: SIM115
 
     def stop(self):
         self.is_running = False

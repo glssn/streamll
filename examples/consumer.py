@@ -79,7 +79,7 @@ def consumer_group_example():
     )
 
     @consumer.on("optimization.trial")
-    def process_trial(event: OptimizationTrialEvent):
+    def process_trial(event: StreamllEvent):
         # Simulate heavy processing
         import time
 
@@ -102,10 +102,10 @@ def batch_processing_example():
 
     # Process first 1000 events
     for event in consumer.iter_events(max_events=1000):
-        if isinstance(event, OptimizationTrialEvent):
+        if event.type == "optimization.trial":
             # Collect trials for analysis
             pass
-        elif isinstance(event, TokenEvent):
+        elif event.type == "token":
             # Skip tokens for this analysis
             pass
 
@@ -130,7 +130,7 @@ class OptiVizConsumer:
         self.consumer.on("optimization.trial")(self.handle_trial)
         self.consumer.on("optimization.complete")(self.handle_complete)
 
-    def handle_trial(self, event: OptimizationTrialEvent):
+    def handle_trial(self, event: StreamllEvent):
         """Process trial for visualization."""
         self.trials.append(
             {

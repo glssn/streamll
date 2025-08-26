@@ -89,7 +89,7 @@ except ImportError:
 # Terminal sinks (always available if producer is installed)
 if _producer_available:
     try:
-        from streamll.sinks import TerminalSink
+        from streamll.sinks import TerminalSink  # noqa: F401
 
         __all__.extend(["TerminalSink"])
     except ImportError:

@@ -1,11 +1,17 @@
 #!/usr/bin/env python
+# /// script
+# dependencies = [
+#   "dspy>=2.6.24",
+#   "streamll @ file://..",
+# ]
+# ///
 """Basic StreamLL example - automatic terminal output.
 
 Requires environment variables:
     GEMINI_API_KEY or OPENROUTER_API_KEY for LLM access
 
 Run with:
-    uv run --env-file .env python examples/basic.py
+    uv run --env-file .env examples/basic.py
 """
 
 import os

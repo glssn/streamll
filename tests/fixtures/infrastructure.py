@@ -1,6 +1,6 @@
 """Universal infrastructure testing utilities for all sink types.
 
-This module provides a common interface for testing Redis, RabbitMQ, Kafka,
+This module provides a common interface for testing Redis, RabbitMQ,
 and other infrastructure components using consistent patterns.
 """
 
@@ -93,8 +93,6 @@ class TestResourceTracker:
         self.redis_streams: set[str] = set()
         self.rabbitmq_queues: set[str] = set()
         self.rabbitmq_exchanges: set[str] = set()
-        self.kafka_topics: set[str] = set()
-        self.kafka_consumer_groups: set[str] = set()
 
     def track_redis_key(self, key: str) -> None:
         """Track Redis key for cleanup."""
@@ -112,13 +110,6 @@ class TestResourceTracker:
         """Track RabbitMQ exchange for cleanup."""
         self.rabbitmq_exchanges.add(exchange)
 
-    def track_kafka_topic(self, topic: str) -> None:
-        """Track Kafka topic for cleanup."""
-        self.kafka_topics.add(topic)
-
-    def track_kafka_consumer_group(self, group: str) -> None:
-        """Track Kafka consumer group for cleanup."""
-        self.kafka_consumer_groups.add(group)
 
 
 @pytest.fixture
@@ -127,7 +118,6 @@ def infrastructure_available():
     return {
         "redis": check_port_open("localhost", 6379),
         "rabbitmq": check_port_open("localhost", 5672),
-        "kafka": check_port_open("localhost", 9092),
     }
 
 

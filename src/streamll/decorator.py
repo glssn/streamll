@@ -104,7 +104,7 @@ def instrument(
             from streamll.sinks import TerminalSink
 
             if not _shared_sinks and not sinks:
-                configure(sinks=[TerminalSink()])
+                configure(sinks=[TerminalSink()], permanent=True)
 
             # Configure module-specific sinks if provided
             if sinks:
