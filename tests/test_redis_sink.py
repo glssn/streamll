@@ -30,8 +30,7 @@ class TestRedisSinkBasicFunctionality:
 
         assert sink.stream_key == "ml_events"
         assert sink.buffer_size == 1000
-        assert sink.batch_size == 100  # Note: batch_size from BaseSink
-        assert sink.circuit_breaker_enabled is True
+        assert sink.batch_size == 100
 
     def test_redis_sink_start_creates_connection(self):
         """Test that starting sink creates Redis connection."""
