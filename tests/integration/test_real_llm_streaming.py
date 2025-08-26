@@ -7,7 +7,6 @@ import dspy
 import pytest
 
 import streamll
-from streamll.models import StreamllEvent
 from streamll.sinks.base import BaseSink
 
 
@@ -37,7 +36,7 @@ class TokenCapturingSink(BaseSink):
     def flush(self):
         """Flush any buffered events."""
         pass
-    
+
     def _write_batch(self, batch):
         """Write batch (not used in test sink)."""
         pass
@@ -71,7 +70,7 @@ class TestRealLLMStreaming(unittest.TestCase):
 
         # Run module
         module = SimpleQA()
-        result = module("Count from 1 to 5.")
+        module("Count from 1 to 5.")
 
         # Verify we got events
         assert len(sink.events) > 0, "Should have captured events"

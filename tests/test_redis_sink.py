@@ -152,7 +152,7 @@ class TestRedisSinkBasicFunctionality:
             pytest.skip("Redis dependencies not installed")
 
         sink = RedisSink(url="redis://localhost:6379", stream_key="test")
-        
+
         # Test the public API - events should be handleable without errors
         # This tests the interface, not internal serialization details
         try:
