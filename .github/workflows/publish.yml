@@ -1,19 +1,15 @@
 name: Publish to PyPI
 
 on:
-  push:
-    tags:
-      - 'v*'
   release:
     types: [published]
-  workflow_dispatch:
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    environment: pypi
     permissions:
-      id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
+      id-token: write  # Required for PyPI trusted publishing
+      contents: read
 
     steps:
       - name: Checkout code
@@ -25,11 +21,8 @@ jobs:
           enable-cache: true
 
       - name: Build package
-        run: uv build
+        run: uv build --no-sources
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          # Use PyPI trusted publishers (recommended)
-          # OR use token authentication by uncommenting below:
-          # password: ${{ secrets.PYPI_TOKEN }}
+        # Uses PyPI trusted publishers - no token needed

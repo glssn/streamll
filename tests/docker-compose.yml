@@ -1,4 +1,4 @@
-version: '3.8'
+# Modern docker-compose format - no version needed
 
 services:
   redis-test:
@@ -30,37 +30,7 @@ services:
       timeout: 5s
       retries: 5
 
-  redpanda-test:
-    image: redpandadata/redpanda:latest
-    command:
-      - redpanda
-      - start
-      - --smp
-      - "1"
-      - --memory
-      - "1G"
-      - --reserve-memory
-      - "0M"
-      - --overprovisioned
-      - --node-id
-      - "0"
-      - --kafka-addr
-      - "PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092"
-      - --advertise-kafka-addr
-      - "PLAINTEXT://redpanda:29092,OUTSIDE://localhost:9092"
-    ports:
-      - "9092:9092"
-      - "29092:29092"
-    volumes:
-      - redpanda_test_data:/var/lib/redpanda/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "localhost:9644/v1/status/ready"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 10s
 
 volumes:
   redis_test_data:
   rabbitmq_test_data:
-  redpanda_test_data:

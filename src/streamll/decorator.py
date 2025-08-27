@@ -12,7 +12,7 @@ import dspy
 from streamll.dspy_callback import StreamllDSPyCallback
 
 
-def instrument(
+def instrument(  # noqa: C901
     cls: type[dspy.Module] | None = None,
     *,
     sinks: list[Any] | None = None,
@@ -69,7 +69,7 @@ def instrument(
             )
 
         # Mark as instrumented
-        cls._streamll_instrumented = True
+        cls._streamll_instrumented = True  # type: ignore[attr-defined]
 
         # Save original __init__
         original_init = cls.__init__
@@ -104,7 +104,7 @@ def instrument(
             from streamll.sinks import TerminalSink
 
             if not _shared_sinks and not sinks:
-                configure(sinks=[TerminalSink()])
+                configure(sinks=[TerminalSink()], permanent=True)
 
             # Configure module-specific sinks if provided
             if sinks:

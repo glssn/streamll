@@ -50,9 +50,13 @@ except ImportError:
             "Producer functionality not installed. Install with: pip install streamll[producer]"
         )
 
-    configure = instrument = emit = emit_event = trace = create_streaming_wrapper = (
-        _producer_not_installed
-    )
+    # Explicitly shadow functions with error handlers (type: ignore to suppress warnings)
+    configure = _producer_not_installed  # type: ignore[assignment]
+    instrument = _producer_not_installed  # type: ignore[assignment]
+    emit = _producer_not_installed  # type: ignore[assignment]
+    emit_event = _producer_not_installed  # type: ignore[assignment]
+    trace = _producer_not_installed  # type: ignore[assignment]
+    create_streaming_wrapper = _producer_not_installed  # type: ignore[assignment]
 
 # =============================================================================
 # CONSUMER IMPORTS (Requires: pip install streamll[consumer])
@@ -80,7 +84,7 @@ except ImportError:
                 "Install with: pip install streamll[redis-consumer]"
             )
 
-    RedisStreamConsumer = BaseConsumer
+    RedisStreamConsumer = BaseConsumer  # type: ignore[assignment]
 
 # =============================================================================
 # SINK IMPORTS (Conditional based on installed extras)
@@ -89,7 +93,7 @@ except ImportError:
 # Terminal sinks (always available if producer is installed)
 if _producer_available:
     try:
-        from streamll.sinks import TerminalSink
+        from streamll.sinks import TerminalSink  # noqa: F401
 
         __all__.extend(["TerminalSink"])
     except ImportError:
@@ -97,7 +101,7 @@ if _producer_available:
 
 # Redis sink
 try:
-    from streamll.sinks import RedisSink
+    from streamll.sinks import RedisSink  # type: ignore[possibly-unbound-import]
 
     __all__.append("RedisSink")
 except ImportError:
@@ -111,7 +115,7 @@ except ImportError:
 
 # RabbitMQ sink
 try:
-    from streamll.sinks import RabbitMQSink
+    from streamll.sinks import RabbitMQSink  # type: ignore[possibly-unbound-import]
 
     __all__.append("RabbitMQSink")
 except ImportError:

@@ -35,7 +35,7 @@ core = []
 
 # Producer dependencies (for creating events)
 producer-base = [
-    "dspy>=2.6.24,<4.0.0",
+    "dspy>=3.0.0,<4.0.0",
     "pydantic>=2.0",
     "nanoid>=2.0",
     "typing-extensions>=4.0",
@@ -51,11 +51,6 @@ rabbitmq-producer = [
     "streamll[producer-base]",
     "aio-pika>=5.0.0,<10.0.0",
 ]
-kafka-producer = [
-    "streamll[producer-base]",
-    "aiokafka>=0.10.0,<1.0.0",
-    "python-snappy>=0.7.3",
-]
 terminal-producer = [
     "streamll[producer-base]",
     "rich>=14.1.0",
@@ -68,9 +63,6 @@ redis-consumer = [
 rabbitmq-consumer = [
     "aio-pika>=5.0.0,<10.0.0",
 ]
-kafka-consumer = [
-    "aiokafka>=0.10.0,<1.0.0",
-]
 
 # Convenience bundles
 producer = [
@@ -80,7 +72,7 @@ consumer = [
     "streamll[redis-consumer,rabbitmq-consumer]",
 ]
 all = [
-    "streamll[producer,consumer,kafka-producer,kafka-consumer]",
+    "streamll[producer,consumer]",
 ]
 
 # Development dependencies
@@ -116,10 +108,8 @@ markers = [
     "performance: marks tests as performance benchmarks",
     "redis: marks tests that require Redis",
     "rabbitmq: marks tests that require RabbitMQ",
-    "kafka: marks tests that require Kafka/Redpanda",
     "slow: marks tests that take longer than 10 seconds",
     "future: marks tests for future functionality (may be skipped)",
-    "redpanda: marks tests that use Redpanda instead of Redis",
     "aspirational: marks tests for aspirational/prototype functionality",
 ]
 

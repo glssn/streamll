@@ -11,11 +11,6 @@ from streamll.models import StreamllEvent
 from streamll.sinks.rabbitmq import RabbitMQSink
 from streamll.sinks.redis import RedisSink
 
-try:
-    from streamll.sinks.kafka import KafkaSink
-except ImportError:
-    KafkaSink = None
-
 
 class IntegrationTestBase:
     """Base class for integration tests with common utilities.
@@ -111,9 +106,7 @@ def test_redis_sink(redis_client):
             stream_key = f"test_stream_{int(time.time() * 1000)}"
 
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
-        sink = RedisSink(
-            url=redis_url, stream_key=stream_key, buffer_size=1000, max_batch_size=100, **kwargs
-        )
+        sink = RedisSink(url=redis_url, stream_key=stream_key, **kwargs)
         return sink
 
     return _create_redis_sink
@@ -133,50 +126,14 @@ def test_rabbitmq_sink(rabbitmq_url):
             routing_key = "test.{event_type}.{operation}"
 
         sink = RabbitMQSink(
-            amqp_url=rabbitmq_url,
+            url=rabbitmq_url,
             exchange=exchange,
             routing_key=routing_key,
-            durable=False,  # Non-durable for faster test cleanup
-            circuit_breaker=True,
-            failure_threshold=3,
-            recovery_timeout=1.0,  # Fast recovery for tests
             **kwargs,
         )
         return sink
 
     return _create_rabbitmq_sink
-
-
-@pytest.fixture(scope="session")
-def kafka_url():
-    """Kafka/Redpanda connection URL for integration tests."""
-    return os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
-
-
-@pytest.fixture(scope="session")
-def test_kafka_sink(kafka_url):
-    """Kafka sink factory for integration tests."""
-    if KafkaSink is None:
-        pytest.skip("Kafka sink not available (aiokafka not installed)")
-
-    def _create_kafka_sink(topic: str | None = None, **kwargs):
-        """Create Kafka sink with test configuration."""
-        if topic is None:
-            topic = f"test_topic_{int(time.time() * 1000)}"
-
-        sink = KafkaSink(
-            bootstrap_servers=kafka_url,
-            topic=topic,
-            circuit_breaker=True,
-            failure_threshold=3,
-            recovery_timeout=1.0,  # Fast recovery for tests
-            batch_size=10,  # Small batch for faster tests
-            batch_timeout_ms=100,
-            **kwargs,
-        )
-        return sink
-
-    return _create_kafka_sink
 
 
 # Pytest markers for test organization

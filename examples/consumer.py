@@ -79,7 +79,7 @@ def consumer_group_example():
     )
 
     @consumer.on("optimization.trial")
-    def process_trial(event: OptimizationTrialEvent):
+    def process_trial(event: StreamllEvent):
         # Simulate heavy processing
         import time
 
@@ -102,10 +102,10 @@ def batch_processing_example():
 
     # Process first 1000 events
     for event in consumer.iter_events(max_events=1000):
-        if isinstance(event, OptimizationTrialEvent):
+        if event.type == "optimization.trial":
             # Collect trials for analysis
             pass
-        elif isinstance(event, TokenEvent):
+        elif event.type == "token":
             # Skip tokens for this analysis
             pass
 
@@ -130,30 +130,32 @@ class OptiVizConsumer:
         self.consumer.on("optimization.trial")(self.handle_trial)
         self.consumer.on("optimization.complete")(self.handle_complete)
 
-    def handle_trial(self, event: OptimizationTrialEvent):
+    def handle_trial(self, event: StreamllEvent):
         """Process trial for visualization."""
-        self.trials.append(
-            {
-                "number": event.trial_number,
-                "score": event.score,
-                "parameters": event.parameters,
-                "timestamp": event.timestamp,
-            }
-        )
+        # Extract data from generic event structure
+        trial_data = {
+            "number": event.data.get("trial_number", len(self.trials) + 1),
+            "score": event.data.get("score", 0.0),
+            "parameters": event.data.get("parameters", {}),
+            "timestamp": event.timestamp,
+        }
+        self.trials.append(trial_data)
 
-        if event.score > self.best_score:
-            self.best_score = event.score
+        score = event.data.get("score", 0.0)
+        if score > self.best_score:
+            self.best_score = score
             self.send_to_dashboard(
                 {
                     "type": "new_best",
-                    "trial": event.trial_number,
-                    "score": event.score,
+                    "trial": event.data.get("trial_number", len(self.trials)),
+                    "score": score,
                 }
             )
 
-        # Update token usage
-        if event.token_usage:
-            for key, value in event.token_usage.items():
+        # Update token usage from event data
+        token_usage = event.data.get("token_usage")
+        if token_usage:
+            for key, value in token_usage.items():
                 self.token_usage[key] = self.token_usage.get(key, 0) + value
 
     def handle_complete(self, event):

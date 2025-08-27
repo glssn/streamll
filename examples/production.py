@@ -14,7 +14,7 @@ import os
 import dspy
 
 import streamll
-from streamll.sinks import RedisSink
+from streamll.sinks import RedisSink  # type: ignore[possibly-unbound-import]
 
 # Configure Redis sink
 redis_sink = RedisSink(url="redis://localhost:6379", stream_key="dspy_events")
