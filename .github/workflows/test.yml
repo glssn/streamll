@@ -34,7 +34,7 @@ jobs:
       - name: Install project in editable mode
         run: uv pip install -e .
       - name: Run unit tests
-        run: uv run pytest -m "not (redis or rabbitmq)" --cov=src/streamll
+        run: uv run pytest -m "not integration" --cov=src/streamll
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -83,7 +83,7 @@ jobs:
         run: |
           export REDIS_URL="redis://localhost:6379"
           export RABBITMQ_URL="amqp://streamll_test:streamll_test@localhost:5672/streamll"
-          uv run pytest -m "redis or rabbitmq" -v
+          uv run pytest -m integration -v
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
