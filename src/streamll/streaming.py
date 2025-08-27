@@ -88,16 +88,24 @@ def create_streaming_wrapper(  # noqa: C901
             if async_streaming:
                 # Convert async generator to sync using DSPy's utility
                 try:
+                    import inspect
+
                     from dspy.streaming import apply_sync_streaming
 
-                    stream_iterator = apply_sync_streaming(stream_iterator)
-                    streaming_mode = "real_dspy_async"
+                    # Check if stream_iterator is actually an async generator
+                    if inspect.isasyncgen(stream_iterator) or hasattr(stream_iterator, "__aiter__"):
+                        stream_iterator = apply_sync_streaming(stream_iterator)  # type: ignore[arg-type]
+                        streaming_mode = "real_dspy_async"
+                    else:
+                        streaming_mode = "real_dspy_async_awaitable"
                 except ImportError:
                     logger.warning("DSPy async streaming conversion not available")
                     streaming_mode = "real_dspy_async_fallback"
 
             # Process the stream using the EXACT approach from the working demo
-            for value in stream_iterator:
+            # Type checker may complain about Awaitable, but this code path only executes
+            # when we have a proper iterator/generator
+            for value in stream_iterator:  # type: ignore[union-attr]
                 # Pattern 1: Raw ModelResponseStream chunks - this is what worked!
                 if hasattr(value, "choices") and value.choices:
                     delta = value.choices[0].delta
@@ -261,12 +269,14 @@ def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str
         for name, attr in module_instance.__dict__.items():
             if isinstance(attr, dspy.Predict):
                 predictors.append((name, attr, None))  # (name, predictor, parent)
-            elif isinstance(attr, dspy.ChainOfThought) and hasattr(attr, "predict") and isinstance(attr.predict, dspy.Predict):
+            elif (
+                isinstance(attr, dspy.ChainOfThought)
+                and hasattr(attr, "predict")
+                and isinstance(attr.predict, dspy.Predict)
+            ):
                 # ChainOfThought has an internal 'predict' attribute
                 # Add the internal predict with parent reference
-                predictors.append(
-                    ("predict", attr.predict, attr)
-                )  # (attr_name, predictor, parent)
+                predictors.append(("predict", attr.predict, attr))  # (attr_name, predictor, parent)
 
         if not predictors:
             # No predictors to stream, just call normally

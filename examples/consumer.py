@@ -132,28 +132,30 @@ class OptiVizConsumer:
 
     def handle_trial(self, event: StreamllEvent):
         """Process trial for visualization."""
-        self.trials.append(
-            {
-                "number": event.trial_number,
-                "score": event.score,
-                "parameters": event.parameters,
-                "timestamp": event.timestamp,
-            }
-        )
+        # Extract data from generic event structure
+        trial_data = {
+            "number": event.data.get("trial_number", len(self.trials) + 1),
+            "score": event.data.get("score", 0.0),
+            "parameters": event.data.get("parameters", {}),
+            "timestamp": event.timestamp,
+        }
+        self.trials.append(trial_data)
 
-        if event.score > self.best_score:
-            self.best_score = event.score
+        score = event.data.get("score", 0.0)
+        if score > self.best_score:
+            self.best_score = score
             self.send_to_dashboard(
                 {
                     "type": "new_best",
-                    "trial": event.trial_number,
-                    "score": event.score,
+                    "trial": event.data.get("trial_number", len(self.trials)),
+                    "score": score,
                 }
             )
 
-        # Update token usage
-        if event.token_usage:
-            for key, value in event.token_usage.items():
+        # Update token usage from event data
+        token_usage = event.data.get("token_usage")
+        if token_usage:
+            for key, value in token_usage.items():
                 self.token_usage[key] = self.token_usage.get(key, 0) + value
 
     def handle_complete(self, event):

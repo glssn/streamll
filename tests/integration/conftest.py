@@ -126,13 +126,9 @@ def test_rabbitmq_sink(rabbitmq_url):
             routing_key = "test.{event_type}.{operation}"
 
         sink = RabbitMQSink(
-            amqp_url=rabbitmq_url,
+            url=rabbitmq_url,
             exchange=exchange,
             routing_key=routing_key,
-            durable=False,  # Non-durable for faster test cleanup
-            circuit_breaker=True,
-            failure_threshold=3,
-            recovery_timeout=1.0,  # Fast recovery for tests
             **kwargs,
         )
         return sink

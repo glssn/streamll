@@ -111,7 +111,7 @@ def _configure_permanently(
 
 def configure(
     sinks: list[Any] | None = None, event_filter: set[str] | None = None, permanent: bool = False
-) -> ConfigurationContext | None:
+) -> ConfigurationContext:
     """Configure shared streamll settings.
 
     Args:
@@ -120,18 +120,14 @@ def configure(
         permanent: If True, configure permanently; if False, return context manager
 
     Returns:
-        ConfigurationContext for use as context manager when sinks provided, otherwise None
+        ConfigurationContext for use as context manager
     """
     # For permanent configuration (e.g., from decorator)
     if permanent or (sinks is None and event_filter is not None):
         _configure_permanently(sinks, event_filter)
-        return None
 
-    # When sinks are provided, return a context manager for temporary configuration
-    if sinks is not None:
-        return ConfigurationContext(sinks, event_filter)
-
-    return None
+    # Always return a context manager - it will handle permanent vs temporary config
+    return ConfigurationContext(sinks, event_filter)
 
 
 def configure_module(instance: Any, sinks: list[Any]) -> None:

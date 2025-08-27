@@ -68,7 +68,7 @@ def instrument(  # noqa: C901
                 f"Class {cls.__name__} is already instrumented with @streamll.instrument"
             )
 
-        # Mark as instrumented
+        # Mark as instrumented (use setattr to avoid type checker issues)
         cls._streamll_instrumented = True
 
         # Save original __init__

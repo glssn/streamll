@@ -49,7 +49,7 @@ class RedisStreamConsumer(BaseConsumer):
         self.redis_url = redis_url
         self.stream_key = stream_key
         self.consumer_group = consumer_group
-        self.consumer_name = consumer_name or f"consumer-{generate_event_id(8)}"
+        self.consumer_name = consumer_name or f"consumer-{generate_event_id()}"
         self.batch_size = batch_size
         self.block_ms = block_ms
         self.start_id = start_id
