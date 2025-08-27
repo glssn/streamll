@@ -106,9 +106,7 @@ def test_redis_sink(redis_client):
             stream_key = f"test_stream_{int(time.time() * 1000)}"
 
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
-        sink = RedisSink(
-            url=redis_url, stream_key=stream_key, **kwargs
-        )
+        sink = RedisSink(url=redis_url, stream_key=stream_key, **kwargs)
         return sink
 
     return _create_redis_sink
@@ -140,8 +138,6 @@ def test_rabbitmq_sink(rabbitmq_url):
         return sink
 
     return _create_rabbitmq_sink
-
-
 
 
 # Pytest markers for test organization

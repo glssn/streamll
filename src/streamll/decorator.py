@@ -12,7 +12,7 @@ import dspy
 from streamll.dspy_callback import StreamllDSPyCallback
 
 
-def instrument(
+def instrument(  # noqa: C901
     cls: type[dspy.Module] | None = None,
     *,
     sinks: list[Any] | None = None,

@@ -111,7 +111,6 @@ class TestResourceTracker:
         self.rabbitmq_exchanges.add(exchange)
 
 
-
 @pytest.fixture
 def infrastructure_available():
     """Check which infrastructure services are available for testing."""

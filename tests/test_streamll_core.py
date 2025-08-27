@@ -81,7 +81,11 @@ class TestStreamllTraceContext:
         sink = CapturingSink()
         sink.start()
 
-        with streamll.configure(sinks=[sink]), pytest.raises(ValueError), streamll.trace("error_operation"):
+        with (
+            streamll.configure(sinks=[sink]),
+            pytest.raises(ValueError),
+            streamll.trace("error_operation"),
+        ):
             raise ValueError("Test error")
 
         sink.stop()
@@ -126,6 +130,7 @@ class TestStreamllDecorator:
     def test_instrument_decorator_with_terminal_sink(self):
         """Test @instrument decorator creates terminal sink by default."""
         import dspy
+
         io.StringIO()
 
         @streamll.instrument
@@ -153,7 +158,7 @@ class TestStreamllSinks:
             execution_id="exec123",
             event_type="start",
             operation="test_op",
-            data={}
+            data={},
         )
 
         sink.handle_event(event)

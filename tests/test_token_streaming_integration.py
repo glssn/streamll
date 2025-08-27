@@ -30,6 +30,7 @@ from streamll.sinks.base import BaseSink
 def reset_dspy():
     """Reset DSPy state between tests."""
     import dspy
+
     # Clear all global state
     dspy.configure()
     dspy.settings.configure()
@@ -87,7 +88,7 @@ class TokenCollectorSink(BaseSink):
 def test_token_streaming_with_openrouter():
     """Test token-by-token streaming with OpenRouter models."""
     import dspy
-    
+
     # Configure DSPy with OpenRouter - use DeepSeek which streams well
     lm = dspy.LM("openrouter/deepseek/deepseek-chat", max_tokens=50, cache=False)
     dspy.configure(lm=lm)
@@ -113,7 +114,9 @@ def test_token_streaming_with_openrouter():
 
     # Verify we got events
     assert len(collector.all_events) > 0, "Should capture events"
-    assert len(collector.token_events) >= 1, f"Should capture token events, got {len(collector.token_events)}"
+    assert len(collector.token_events) >= 1, (
+        f"Should capture token events, got {len(collector.token_events)}"
+    )
 
     # Check token events have correct structure
     for token_event in collector.token_events:
@@ -132,7 +135,7 @@ def test_token_streaming_with_openrouter():
 def test_multi_field_streaming():
     """Test streaming multiple fields (reasoning + answer)."""
     import dspy
-    
+
     lm = dspy.LM("openrouter/deepseek/deepseek-chat", max_tokens=100, cache=False)
     dspy.configure(lm=lm)
 
@@ -160,7 +163,6 @@ def test_multi_field_streaming():
     # At least one field should have tokens
     total_tokens = len(reasoning_tokens) + len(answer_tokens)
     assert total_tokens > 0, "Should get tokens for reasoning or answer fields"
-
 
 
 if __name__ == "__main__":

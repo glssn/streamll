@@ -24,19 +24,19 @@ _global_event_filter: set[str] | None = None
 
 class ConfigurationContext:
     """Context manager for temporary sink configuration during testing."""
-    
+
     def __init__(self, sinks: list[Any] | None = None, event_filter: set[str] | None = None):
         self.sinks = sinks or []
         self.event_filter = event_filter
         self.previous_sinks = []
         self.previous_filter = None
-        
+
     def __enter__(self):
         # Save current state
         global _shared_sinks, _global_event_filter
         self.previous_sinks = _shared_sinks.copy()
         self.previous_filter = _global_event_filter
-        
+
         # Apply new configuration directly
         if self.sinks:
             # Validate sinks implement BaseSink interface
@@ -58,30 +58,32 @@ class ConfigurationContext:
         # Set event filter
         if self.event_filter is not None:
             _global_event_filter = self.event_filter
-            
+
         return self
-        
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         # Restore previous state
         global _shared_sinks, _global_event_filter
-        
+
         # Stop current sinks
         for sink in _shared_sinks:
             if sink.is_running:
                 sink.stop()
-        
+
         # Restore previous sinks
         _shared_sinks.clear()
         _shared_sinks.extend(self.previous_sinks)
         _global_event_filter = self.previous_filter
-        
+
         # Start previous sinks if they were running
         for sink in _shared_sinks:
             if not sink.is_running:
                 sink.start()
 
 
-def _configure_permanently(sinks: list[Any] | None = None, event_filter: set[str] | None = None) -> None:
+def _configure_permanently(
+    sinks: list[Any] | None = None, event_filter: set[str] | None = None
+) -> None:
     """Permanently configure shared streamll settings (internal use)."""
     global _shared_sinks, _global_event_filter
 
@@ -107,14 +109,16 @@ def _configure_permanently(sinks: list[Any] | None = None, event_filter: set[str
         _global_event_filter = event_filter
 
 
-def configure(sinks: list[Any] | None = None, event_filter: set[str] | None = None, permanent: bool = False) -> ConfigurationContext | None:
+def configure(
+    sinks: list[Any] | None = None, event_filter: set[str] | None = None, permanent: bool = False
+) -> ConfigurationContext | None:
     """Configure shared streamll settings.
 
     Args:
         sinks: List of shared sink instances (like TerminalSink)
         event_filter: Set of event types to emit (None = all events)
         permanent: If True, configure permanently; if False, return context manager
-        
+
     Returns:
         ConfigurationContext for use as context manager when sinks provided, otherwise None
     """
@@ -122,11 +126,11 @@ def configure(sinks: list[Any] | None = None, event_filter: set[str] | None = No
     if permanent or (sinks is None and event_filter is not None):
         _configure_permanently(sinks, event_filter)
         return None
-    
+
     # When sinks are provided, return a context manager for temporary configuration
     if sinks is not None:
         return ConfigurationContext(sinks, event_filter)
-    
+
     return None
 
 

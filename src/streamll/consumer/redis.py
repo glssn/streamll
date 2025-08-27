@@ -132,7 +132,7 @@ class RedisStreamConsumer(BaseConsumer):
         events = await self.consume_batch(max_events=1)
         return events[0] if events else None
 
-    async def consume_batch(self, max_events: int | None = None) -> list[StreamllEvent]:
+    async def consume_batch(self, max_events: int | None = None) -> list[StreamllEvent]:  # noqa: C901
         """Consume a batch of events from Redis stream.
 
         Args:

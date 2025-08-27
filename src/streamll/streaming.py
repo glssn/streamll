@@ -12,7 +12,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-def create_streaming_wrapper(
+def create_streaming_wrapper(  # noqa: C901
     module: Any,
     signature_field_name: str,
     event_type: str = "token",
@@ -73,7 +73,7 @@ def create_streaming_wrapper(
         logger.info("Falling back to non-streaming mode")
         return module
 
-    def streaming_wrapper(*args, **kwargs):
+    def streaming_wrapper(*args, **kwargs):  # noqa: C901
         """Execute the module with streaming and emit StreamLL events."""
 
         token_index = 0
@@ -224,7 +224,7 @@ def create_multi_field_streaming_wrapper(
     )
 
 
-def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str]) -> Callable:
+def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str]) -> Callable:  # noqa: C901
     """Wrap a forward method to enable token streaming.
 
     This function is used by the @instrument decorator to wrap forward methods
@@ -253,7 +253,7 @@ def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str
         # Return unwrapped method if streaming not available
         return forward_method
 
-    def streaming_forward(*args, **kwargs):
+    def streaming_forward(*args, **kwargs):  # noqa: C901
         """Execute forward with streaming and emit TokenEvents."""
 
         # Find all Predict modules in the instance
@@ -261,13 +261,12 @@ def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str
         for name, attr in module_instance.__dict__.items():
             if isinstance(attr, dspy.Predict):
                 predictors.append((name, attr, None))  # (name, predictor, parent)
-            elif isinstance(attr, dspy.ChainOfThought):
+            elif isinstance(attr, dspy.ChainOfThought) and hasattr(attr, "predict") and isinstance(attr.predict, dspy.Predict):
                 # ChainOfThought has an internal 'predict' attribute
-                if hasattr(attr, "predict") and isinstance(attr.predict, dspy.Predict):
-                    # Add the internal predict with parent reference
-                    predictors.append(
-                        ("predict", attr.predict, attr)
-                    )  # (attr_name, predictor, parent)
+                # Add the internal predict with parent reference
+                predictors.append(
+                    ("predict", attr.predict, attr)
+                )  # (attr_name, predictor, parent)
 
         if not predictors:
             # No predictors to stream, just call normally
@@ -304,11 +303,11 @@ def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str
                 )
 
                 # Create wrapper that processes stream
-                def make_streaming_wrapper(pred_name, indices):
+                def make_streaming_wrapper(pred_name, indices, predictor):
                     def streaming_predict(*pred_args, **pred_kwargs):
                         result = None
-                        stream_output = stream_predictor(*pred_args, **pred_kwargs)
-                        
+                        stream_output = predictor(*pred_args, **pred_kwargs)
+
                         for chunk in stream_output:
                             if isinstance(chunk, StreamResponse):
                                 field_name = chunk.signature_field_name
@@ -338,7 +337,7 @@ def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str
                     return streaming_predict
 
                 # Replace predictor with streaming version
-                wrapper = make_streaming_wrapper(predictor_name, token_indices)
+                wrapper = make_streaming_wrapper(predictor_name, token_indices, stream_predictor)
                 if parent is not None:
                     # This is from ChainOfThought, set on parent
                     setattr(parent, predictor_name, wrapper)
