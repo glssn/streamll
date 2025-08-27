@@ -101,7 +101,7 @@ if _producer_available:
 
 # Redis sink
 try:
-    from streamll.sinks import RedisSink
+    from streamll.sinks import RedisSink  # type: ignore[possibly-unbound-import]
 
     __all__.append("RedisSink")
 except ImportError:
@@ -115,7 +115,7 @@ except ImportError:
 
 # RabbitMQ sink
 try:
-    from streamll.sinks import RabbitMQSink
+    from streamll.sinks import RabbitMQSink  # type: ignore[possibly-unbound-import]
 
     __all__.append("RabbitMQSink")
 except ImportError:

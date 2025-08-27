@@ -150,7 +150,7 @@ class TestStreamllSinks:
     def test_terminal_sink_formatting(self):
         """Test TerminalSink formats events correctly."""
         output = io.StringIO()
-        sink = streamll.TerminalSink(output=output)
+        sink = streamll.TerminalSink(output=output)  # type: ignore[possibly-unbound-attribute]
         sink.start()
 
         event = StreamllEvent(
@@ -171,5 +171,5 @@ class TestStreamllSinks:
         """Test RedisSink basic functionality."""
         # Test without actual Redis - just initialization
         sink = streamll.RedisSink(url="redis://localhost:6379", stream_key="test")
-        assert sink.url == "redis://localhost:6379"
-        assert sink.stream_key == "test"
+        assert sink.url == "redis://localhost:6379"  # type: ignore[possibly-unbound-attribute]
+        assert sink.stream_key == "test"  # type: ignore[possibly-unbound-attribute]

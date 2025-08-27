@@ -69,7 +69,7 @@ def instrument(  # noqa: C901
             )
 
         # Mark as instrumented (use setattr to avoid type checker issues)
-        cls._streamll_instrumented = True
+        setattr(cls, "_streamll_instrumented", True)
 
         # Save original __init__
         original_init = cls.__init__

@@ -29,12 +29,13 @@ services:
       RABBITMQ_DEFAULT_USER: streamll_test
       RABBITMQ_DEFAULT_PASS: streamll_test
       RABBITMQ_DEFAULT_VHOST: streamll
+      RABBITMQ_VM_MEMORY_HIGH_WATERMARK: 0.8
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      test: ["CMD", "rabbitmqctl", "status"]
       interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
+      timeout: 10s
+      retries: 15
+      start_period: 60s
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
