@@ -33,7 +33,6 @@ jobs:
 
       - name: Install project in editable mode
         run: uv pip install -e .
-        
       - name: Run unit tests
         run: uv run pytest -m "not (redis or rabbitmq)" --cov=src/streamll
         env:
