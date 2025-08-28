@@ -5,7 +5,7 @@
 #   "streamll @ file://..",
 # ]
 # ///
-"""Basic StreamLL example - automatic terminal output.
+"""Basic StreamLL example showing trace() inside forward() method.
 
 Requires environment variables:
     GEMINI_API_KEY or OPENROUTER_API_KEY for LLM access
@@ -15,25 +15,38 @@ Run with:
 """
 
 import os
+import time
 
 import dspy
 
 import streamll
 
 
-@streamll.instrument
-class SimpleQA(dspy.Module):
+class RetrievalQA(dspy.Module):
+    """Example showing internal tracing for retrieval + generation."""
+
     def __init__(self):
         super().__init__()
         self.predict = dspy.Predict("question -> answer")
 
     def forward(self, question):
-        return self.predict(question=question)
+        with streamll.trace("retrieving") as ctx:
+            # Simulate document retrieval (long blocking operation)
+            time.sleep(0.1)  # Simulate retrieval delay
+            ctx.emit("documents_found", data={"count": 3, "query": question[:50]})
+
+        with streamll.trace("generating") as ctx:
+            # Generate answer based on retrieved context
+            result = self.predict(question=question)
+            ctx.emit(
+                "tokens_generated",
+                data={"answer_length": len(result.answer) if hasattr(result, "answer") else 0},
+            )
+            return result
 
 
-# Configure DSPy with available LLM from environment
+# Configure DSPy with available LLM
 if os.getenv("OPENROUTER_API_KEY"):
-    # OpenRouter provides the best streaming support
     dspy.configure(lm=dspy.LM("openrouter/qwen/qwen-2.5-72b-instruct"))
 elif os.getenv("GEMINI_API_KEY"):
     dspy.configure(lm=dspy.LM("gemini/gemini-2.0-flash-exp"))
@@ -43,46 +56,7 @@ else:
         "Run with: uv run --env-file .env python examples/basic.py"
     )
 
-# Create and run module - events auto-stream to terminal
-qa = SimpleQA()
+# Run the example - events auto-stream to terminal
+qa = RetrievalQA()
 result = qa("What is the capital of France?")
 
-
-# Example 1: Basic usage - automatic start/end events
-with streamll.trace("data_processing"):
-    # Some work happens here
-    result = qa("What is Python?")
-    # That's it! You automatically get:
-    # → [START] data_processing
-    # → [END] data_processing (duration: 0.23s)
-
-with streamll.trace("retrieval") as ctx:
-    result = qa("What is machine learning?")
-    ctx.emit("result_length", data={"length": len(result.answer)})
-    # You get:
-    # → [START] retrieval
-    # → [CUSTOM] result_length {length: 125}
-    # → [END] retrieval (duration: 0.45s)
-
-try:
-    with streamll.trace("risky_operation"):
-        # If an error occurs, you get ERROR event instead of END
-        result = qa("What is the meaning of life?")
-        if "42" not in result.answer:
-            raise ValueError("Wrong answer!")
-except ValueError:
-    pass
-    # You got:
-    # → [START] risky_operation
-    # → [ERROR] risky_operation - ValueError: Wrong answer!
-
-with streamll.trace("outer_operation") as outer, streamll.trace("inner_operation") as inner:
-    result = qa("What is 2+2?")
-    # Inner completes first
-
-# Then outer completes
-# Events show proper nesting:
-# → [START] outer_operation
-# → [START] inner_operation
-# → [END] inner_operation
-# → [END] outer_operation
