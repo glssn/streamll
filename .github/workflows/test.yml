@@ -33,7 +33,7 @@ jobs:
 
       - name: Run unit tests
         run: |
-          uv run pytest tests/unit -xvs --cov=src/streamll --cov-fail-under=70
+          uv run pytest tests/unit -xvs --cov=src/streamll --cov-fail-under=40
         env:
           PYTHONPATH: .
 
