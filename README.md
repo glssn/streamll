@@ -71,4 +71,14 @@ pip install streamll[rabbitmq]  # With RabbitMQ
 pip install streamll[all]       # Everything
 ```
 
+## Development
+
+```bash
+# Run tests
+uv run pytest
+
+# With coverage
+uv run pytest --cov=src/streamll
+```
+
 MIT License
