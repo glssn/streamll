@@ -81,6 +81,7 @@ class RedisSink(BaseSink):
             logger.info(f"Connected to Redis at {self.host}:{self.port}")
         except Exception as e:
             logger.warning(f"Failed to connect to Redis: {e}")
+            self._record_failure()
 
     def stop(self) -> None:
         """Stop the sink and close connection."""
