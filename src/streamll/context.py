@@ -25,7 +25,7 @@ _global_event_filter: set[str] | None = None
 def _validate_and_start_sinks(sinks: list[Any]) -> None:
     """Validate sinks and start them."""
     from streamll.sinks.base import BaseSink
-    
+
     for sink in sinks:
         if not isinstance(sink, BaseSink):
             raise TypeError(f"Sink {sink} must implement BaseSink interface")
@@ -97,7 +97,7 @@ def configure(
         ConfigurationContext for use as context manager
     """
     global _shared_sinks, _global_event_filter
-    
+
     if permanent:
         if sinks is not None:
             _validate_and_start_sinks(sinks)
@@ -105,7 +105,7 @@ def configure(
             _shared_sinks.extend(sinks)
         if event_filter is not None:
             _global_event_filter = event_filter
-    
+
     return ConfigurationContext(sinks, event_filter)
 
 
@@ -229,7 +229,7 @@ class StreamllContext:
             "duration_seconds": duration,
             "stage": "error" if exc_type else "end",
         }
-        
+
         if exc_type:
             event_data.update({
                 "error_type": exc_type.__name__,

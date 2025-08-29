@@ -95,7 +95,7 @@ class BaseSink(ABC):
 
     def _write_batch(self, events: list[StreamllEvent]) -> None:
         """Write a batch of events to the sink.
-        
+
         Default implementation writes events immediately one by one.
         Override this method for batch writing (e.g., Redis pipeline).
 

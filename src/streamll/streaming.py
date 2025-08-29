@@ -1,5 +1,4 @@
-"""
-StreamLL Core Streaming Module
+"""StreamLL Core Streaming Module.
 
 Provides real-time streaming capabilities for DSPy modules with StreamLL observability.
 """
@@ -12,154 +11,144 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-def create_streaming_wrapper(  # noqa: C901
+def _process_stream_chunk(
+    chunk: Any,
+    signature_field_name: str,
+    token_index: int,
+    event_type: str,
+    operation: str,
+    streaming_mode: str,
+) -> tuple[str | None, Any | None, int]:
+    """Process a single stream chunk and emit appropriate events.
+
+    Returns:
+        (token_content, final_result, updated_token_index)
+    """
+    from streamll.context import emit
+
+    # Pattern 1: Raw ModelResponseStream chunks
+    if hasattr(chunk, "choices") and chunk.choices:
+        delta = chunk.choices[0].delta
+        if delta and hasattr(delta, "content") and delta.content:
+            emit(
+                event_type,
+                operation=operation,
+                data={
+                    "token": delta.content,
+                    "token_index": token_index,
+                    "signature_field": signature_field_name,
+                    "streaming_mode": streaming_mode,
+                    "provider": _extract_provider_from_chunk(chunk),
+                    "chunk_size": len(delta.content),
+                },
+            )
+            return delta.content, None, token_index + 1
+
+    # Pattern 2: Final prediction result
+    if hasattr(chunk, signature_field_name):
+        return None, chunk, token_index
+
+    # Pattern 3: StreamResponse objects
+    if hasattr(chunk, "chunk") and chunk.chunk:
+        emit(
+            event_type,
+            operation=operation,
+            data={
+                "token": chunk.chunk,
+                "token_index": token_index,
+                "signature_field": signature_field_name,
+                "streaming_mode": f"{streaming_mode}_chunk",
+                "provider": "dspy_chunk",
+            },
+        )
+        return chunk.chunk, None, token_index + 1
+
+    return None, None, token_index
+
+
+def create_streaming_wrapper(
     module: Any,
     signature_field_name: str,
     event_type: str = "token",
     async_streaming: bool = False,
     operation: str | None = None,
 ) -> Callable:
-    """
-    Create a streaming wrapper for any DSPy module.
+    """Create a streaming wrapper for any DSPy module.
 
     This function wraps a DSPy module to emit StreamLL events for each token/chunk
-    as it's generated during streaming, providing real-time observability into
-    LLM response generation.
+    as it's generated during streaming.
 
     Args:
-        module: DSPy module to wrap with streaming (e.g., dspy.ChainOfThought)
-        signature_field_name: Output field to capture streaming from (e.g., "answer")
+        module: DSPy module to wrap with streaming
+        signature_field_name: Output field to capture streaming from
         event_type: StreamLL event type to emit (default: "token")
-        async_streaming: Whether to use async or sync streaming (default: False)
-        operation: Optional operation name for StreamLL events (default: auto-detect)
+        async_streaming: Whether to use async or sync streaming
+        operation: Optional operation name for StreamLL events
 
     Returns:
         Wrapped module function that emits StreamLL events for each token
-
-    Example:
-        >>> import streamll
-        >>> import dspy
-        >>>
-        >>> generate = dspy.ChainOfThought("question -> answer")
-        >>> streaming_generate = streamll.create_streaming_wrapper(
-        ...     generate,
-        ...     signature_field_name="answer"
-        ... )
-        >>>
-        >>> # Now streaming_generate emits token events to StreamLL
-        >>> result = streaming_generate(question="What is 2+2?")
     """
-
-    # Import here to avoid circular dependencies
     from streamll.context import emit
 
     try:
-        from dspy.streaming import StreamListener, streamify  # noqa: F401
+        from dspy.streaming import streamify
     except ImportError as e:
         logger.error("DSPy streaming not available: %s", e)
-        logger.info("Falling back to non-streaming mode")
         return module
 
-    # Determine operation name
     if operation is None:
         operation = f"{module.__class__.__name__.lower()}_streaming"
 
     # Create streaming version using DSPy's streamify
-    # Use raw streamify (no StreamListener) - this is the approach that actually worked
     try:
         streaming_module = streamify(module, async_streaming=async_streaming)
     except Exception as e:
         logger.warning("Failed to create streaming module: %s", e)
-        logger.info("Falling back to non-streaming mode")
         return module
 
-    def streaming_wrapper(*args, **kwargs):  # noqa: C901
+    def streaming_wrapper(*args, **kwargs):
         """Execute the module with streaming and emit StreamLL events."""
-
         token_index = 0
         final_result = None
         streaming_mode = "real_dspy"
 
         try:
-            # Get the streaming iterator
             stream_iterator = streaming_module(*args, **kwargs)
 
             # Handle async vs sync streaming
             if async_streaming:
-                # Convert async generator to sync using DSPy's utility
                 try:
                     import inspect
 
                     from dspy.streaming import apply_sync_streaming
 
-                    # Check if stream_iterator is actually an async generator
                     if inspect.isasyncgen(stream_iterator) or hasattr(stream_iterator, "__aiter__"):
-                        stream_iterator = apply_sync_streaming(stream_iterator)  # type: ignore[arg-type]
+                        stream_iterator = apply_sync_streaming(stream_iterator)
                         streaming_mode = "real_dspy_async"
-                    else:
-                        streaming_mode = "real_dspy_async_awaitable"
                 except ImportError:
                     logger.warning("DSPy async streaming conversion not available")
-                    streaming_mode = "real_dspy_async_fallback"
 
-            # Process the stream using the EXACT approach from the working demo
-            # Type checker may complain about Awaitable, but this code path only executes
-            # when we have a proper iterator/generator
-            for value in stream_iterator:  # type: ignore[union-attr]
-                # Pattern 1: Raw ModelResponseStream chunks - this is what worked!
-                if hasattr(value, "choices") and value.choices:
-                    delta = value.choices[0].delta
-                    if delta and hasattr(delta, "content") and delta.content:
-                        chunk_content = delta.content
-
-                        # Emit token event immediately - exactly like working demo
-                        emit(
-                            event_type,
-                            operation=operation,
-                            data={
-                                "token": chunk_content,
-                                "token_index": token_index,
-                                "signature_field": signature_field_name,
-                                "streaming_mode": streaming_mode,
-                                "provider": _extract_provider_from_chunk(value),
-                                "chunk_size": len(chunk_content),
-                            },
-                        )
-                        token_index += 1
-
-                # Pattern 2: Final prediction result
-                elif hasattr(value, signature_field_name):
-                    final_result = value
+            # Process stream chunks
+            for chunk in stream_iterator:
+                _, final_result, token_index = _process_stream_chunk(
+                    chunk,
+                    signature_field_name,
+                    token_index,
+                    event_type,
+                    operation,
+                    streaming_mode,
+                )
+                if final_result:
                     break
 
-                # Pattern 3: Other chunk formats (future compatibility)
-                elif hasattr(value, "chunk") and value.chunk:
-                    # Handle StreamResponse objects if they exist
-                    emit(
-                        event_type,
-                        operation=operation,
-                        data={
-                            "token": value.chunk,
-                            "token_index": token_index,
-                            "signature_field": signature_field_name,
-                            "streaming_mode": f"{streaming_mode}_chunk",
-                            "provider": "dspy_chunk",
-                        },
-                    )
-                    token_index += 1
-
-            # If we got streaming chunks, but no final result, try to get it normally
+            # If we got streaming chunks but no final result, try normal execution
             if token_index > 0 and final_result is None:
-                logger.info(
-                    f"Got {token_index} streaming chunks, but no final result. Attempting normal execution."
-                )
+                logger.info(f"Got {token_index} streaming chunks, no final result. Attempting normal execution.")
                 try:
                     final_result = module(*args, **kwargs)
                 except Exception as e:
                     logger.warning(f"Failed to get final result after streaming: {e}")
-                    final_result = None
 
-            # Return the final result
             return final_result
 
         except Exception as e:
@@ -169,7 +158,7 @@ def create_streaming_wrapper(  # noqa: C901
             # Fallback: execute normally without streaming
             result = module(*args, **kwargs)
 
-            # Emit the complete response as a single token for consistency
+            # Emit complete response as single token for consistency
             if hasattr(result, signature_field_name):
                 field_content = getattr(result, signature_field_name)
                 if field_content:
@@ -192,8 +181,6 @@ def create_streaming_wrapper(  # noqa: C901
 
 def _extract_provider_from_chunk(chunk: Any) -> str:
     """Extract LLM provider name from streaming chunk."""
-
-    # Try to get model info from the chunk
     if hasattr(chunk, "model") and chunk.model:
         model = chunk.model.lower()
         if "gpt" in model or "openai" in model:
@@ -206,40 +193,42 @@ def _extract_provider_from_chunk(chunk: Any) -> str:
             return "meta"
         else:
             return model
-
-    # Fallback to unknown
     return "unknown"
 
 
-# Utility function for list of streaming fields (future enhancement)
-def create_multi_field_streaming_wrapper(
-    module: Any,
-    signature_field_names: list[str],
-    event_type: str = "token",
-    async_streaming: bool = False,
-) -> Callable:
+def _find_predictors_in_module(module_instance: Any, stream_fields: list[str]) -> list[tuple[str, Any, Any]]:
+    """Find all Predict modules in instance that have fields to stream.
+
+    Returns:
+        List of (name, predictor, parent) tuples
     """
-    Create streaming wrapper for multiple signature fields.
+    import dspy
 
-    This is a future enhancement that allows streaming multiple output fields
-    from a single DSPy module.
+    predictors = []
+    for name, attr in module_instance.__dict__.items():
+        if isinstance(attr, dspy.Predict):
+            predictors.append((name, attr, None))
+        elif isinstance(attr, dspy.ChainOfThought) and hasattr(attr, "predict") and isinstance(attr.predict, dspy.Predict):
+            predictors.append(("predict", attr.predict, attr))
 
-    Note: Currently not implemented - DSPy streaming limitations.
-    """
-    raise NotImplementedError(
-        "Multi-field streaming not yet implemented. "
-        "See BACKLOG-001 for auto-detection of streaming fields."
-    )
+    # Filter to only those with streamable fields
+    result = []
+    for predictor_name, predictor, parent in predictors:
+        try:
+            output_fields = predictor.signature.output_fields
+            if any(f in output_fields for f in stream_fields):
+                result.append((predictor_name, predictor, parent))
+        except (AttributeError, Exception) as e:
+            logger.warning(f"Could not check predictor {predictor_name}: {e}")
+
+    return result
 
 
-def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str]) -> Callable:  # noqa: C901
+def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str]) -> Callable:
     """Wrap a forward method to enable token streaming.
 
     This function is used by the @instrument decorator to wrap forward methods
     for token streaming when stream_fields are specified.
-
-    Since DSPy's streamify expects Module objects (not lambdas), we intercept
-    and wrap the Predict modules within the forward method.
 
     Args:
         forward_method: The original forward method
@@ -258,106 +247,72 @@ def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str
         from dspy.streaming.messages import StreamResponse
     except ImportError as e:
         logger.warning(f"DSPy streaming not available: {e}")
-        # Return unwrapped method if streaming not available
         return forward_method
 
-    def streaming_forward(*args, **kwargs):  # noqa: C901
+    def streaming_forward(*args, **kwargs):
         """Execute forward with streaming and emit TokenEvents."""
 
-        # Find all Predict modules in the instance
-        predictors = []
-        for name, attr in module_instance.__dict__.items():
-            if isinstance(attr, dspy.Predict):
-                predictors.append((name, attr, None))  # (name, predictor, parent)
-            elif (
-                isinstance(attr, dspy.ChainOfThought)
-                and hasattr(attr, "predict")
-                and isinstance(attr.predict, dspy.Predict)
-            ):
-                # ChainOfThought has an internal 'predict' attribute
-                # Add the internal predict with parent reference
-                predictors.append(("predict", attr.predict, attr))  # (attr_name, predictor, parent)
-
+        predictors = _find_predictors_in_module(module_instance, stream_fields)
         if not predictors:
-            # No predictors to stream, just call normally
             return forward_method(*args, **kwargs)
 
         # Store original predictors and wrap them
         original_predictors = []
         for predictor_name, predictor, parent in predictors:
-            # Check if this predictor has fields we want to stream
-            try:
-                output_fields = predictor.signature.output_fields
-                fields_to_stream = [f for f in stream_fields if f in output_fields]
+            original_predictors.append((predictor_name, predictor, parent))
 
-                if not fields_to_stream:
-                    continue
+            # Track token indices per field
+            token_indices = {field: 0 for field in stream_fields if field in predictor.signature.output_fields}
 
-                # Store original with parent info
-                original_predictors.append((predictor_name, predictor, parent))
+            # Create listeners for each field
+            listeners = [StreamListener(signature_field_name=field) for field in token_indices]
 
-                # Track token indices per field
-                token_indices = {field: 0 for field in fields_to_stream}
+            # Wrap with streamify
+            stream_predictor = streamify(
+                predictor,
+                stream_listeners=listeners,
+                async_streaming=False,
+                include_final_prediction_in_output_stream=True,
+            )
 
-                # Create listeners
-                listeners = [
-                    StreamListener(signature_field_name=field) for field in fields_to_stream
-                ]
+            # Create wrapper that processes stream
+            def make_streaming_wrapper(pred_name, indices, predictor):
+                def streaming_predict(*pred_args, **pred_kwargs):
+                    result = None
+                    stream_output = predictor(*pred_args, **pred_kwargs)
 
-                # Wrap with streamify
-                stream_predictor = streamify(
-                    predictor,
-                    stream_listeners=listeners,
-                    async_streaming=False,
-                    include_final_prediction_in_output_stream=True,
-                )
+                    for chunk in stream_output:
+                        if isinstance(chunk, StreamResponse):
+                            field_name = chunk.signature_field_name
+                            if field_name in indices:
+                                event = StreamllEvent(
+                                    event_id=generate_event_id(),
+                                    execution_id=get_execution_id(),
+                                    timestamp=datetime.now(UTC),
+                                    module_name=module_instance.__class__.__name__,
+                                    method_name=pred_name,
+                                    event_type="token",
+                                    data={
+                                        "field": field_name,
+                                        "token": chunk.chunk,
+                                        "token_index": indices[field_name],
+                                    },
+                                )
+                                emit_event(event, module_instance)
+                                indices[field_name] += 1
+                        elif isinstance(chunk, dspy.Prediction):
+                            result = chunk
 
-                # Create wrapper that processes stream
-                def make_streaming_wrapper(pred_name, indices, predictor):
-                    def streaming_predict(*pred_args, **pred_kwargs):
-                        result = None
-                        stream_output = predictor(*pred_args, **pred_kwargs)
+                    return result
 
-                        for chunk in stream_output:
-                            if isinstance(chunk, StreamResponse):
-                                field_name = chunk.signature_field_name
+                return streaming_predict
 
-                                if field_name in indices:
-                                    event = StreamllEvent(
-                                        event_id=generate_event_id(),
-                                        execution_id=get_execution_id(),
-                                        timestamp=datetime.now(UTC),
-                                        module_name=module_instance.__class__.__name__,
-                                        method_name=pred_name,
-                                        event_type="token",
-                                        data={
-                                            "field": field_name,
-                                            "token": chunk.chunk,
-                                            "token_index": indices[field_name],
-                                        },
-                                    )
-                                    emit_event(event, module_instance)
-                                    indices[field_name] += 1
-
-                            elif isinstance(chunk, dspy.Prediction):
-                                result = chunk
-
-                        return result
-
-                    return streaming_predict
-
-                # Replace predictor with streaming version
-                wrapper = make_streaming_wrapper(predictor_name, token_indices, stream_predictor)
-                if parent is not None:
-                    # This is from ChainOfThought, set on parent
-                    setattr(parent, predictor_name, wrapper)
-                else:
-                    # This is a direct Predict on module
-                    setattr(module_instance, predictor_name, wrapper)
-
-            except (AttributeError, Exception) as e:
-                logger.warning(f"Could not wrap predictor {predictor_name}: {e}")
-                continue
+            # Replace predictor with streaming version
+            wrapper = make_streaming_wrapper(predictor_name, token_indices, stream_predictor)
+            if parent is not None:
+                setattr(parent, predictor_name, wrapper)
+            else:
+                setattr(module_instance, predictor_name, wrapper)
 
         try:
             # Call forward with wrapped predictors
@@ -366,10 +321,8 @@ def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str
             # Restore original predictors
             for name, original, parent in original_predictors:
                 if parent is not None:
-                    # Restore on parent (ChainOfThought)
                     setattr(parent, name, original)
                 else:
-                    # Restore on module
                     setattr(module_instance, name, original)
 
         return result
@@ -379,6 +332,6 @@ def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str
 
 __all__ = [
     "create_streaming_wrapper",
-    "create_multi_field_streaming_wrapper",
     "wrap_with_streaming",
 ]
+

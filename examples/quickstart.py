@@ -2,7 +2,9 @@
 """StreamLL Quick Start - Token streaming example."""
 
 import os
+
 import dspy
+
 import streamll
 
 # Configure LLM
@@ -17,11 +19,11 @@ else:
 @streamll.instrument(stream_fields=["answer"])
 class StreamingQA(dspy.Module):
     """Q&A with real-time token streaming."""
-    
+
     def __init__(self):
         super().__init__()
         self.predict = dspy.Predict("question -> answer")
-    
+
     def forward(self, question):
         return self.predict(question=question)
 
@@ -29,11 +31,11 @@ class StreamingQA(dspy.Module):
 @streamll.instrument(stream_fields=["reasoning", "answer"])
 class ReasoningQA(dspy.Module):
     """Chain of thought with streaming for both fields."""
-    
+
     def __init__(self):
         super().__init__()
         self.cot = dspy.ChainOfThought("question -> answer")
-    
+
     def forward(self, question):
         return self.cot(question=question)
 
@@ -43,7 +45,7 @@ print("1. Simple answer streaming:\n")
 qa = StreamingQA()
 qa("What is 2+2? Answer in one sentence.")
 
-# Example 2: Multi-field streaming  
+# Example 2: Multi-field streaming
 print("\n\n2. Reasoning + answer streaming:\n")
 reasoner = ReasoningQA()
 reasoner("If I have 3 apples and buy 2 more, then give 1 away, how many do I have?")

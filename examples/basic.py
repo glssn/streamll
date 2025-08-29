@@ -2,7 +2,9 @@
 """StreamLL Basic Example - Minimal working demo."""
 
 import os
+
 import dspy
+
 import streamll
 
 # Configure LLM
@@ -17,11 +19,11 @@ else:
 @streamll.instrument
 class SimpleQA(dspy.Module):
     """Simple Q&A module with automatic event tracking."""
-    
+
     def __init__(self):
         super().__init__()
         self.predict = dspy.Predict("question -> answer")
-    
+
     def forward(self, question):
         return self.predict(question=question)
 
