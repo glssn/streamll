@@ -5,8 +5,8 @@ StreamLL provides real-time observability for DSPy applications through the `@st
 
 ## Core Philosophy: Less is More
 
-### The 92% Rule
-We successfully reduced this codebase from 11,500 to 900 lines (92% reduction) while **improving** functionality. Always ask:
+### The Simplification Rule
+Core functionality is ~2100 lines (src/). Tests add another ~1900 lines. Always ask:
 - "Do we really need this?"
 - "Can we achieve the same with less?"
 - "Is this solving a real problem or a hypothetical one?"
@@ -54,7 +54,7 @@ with streamll.trace("operation") as ctx:
 - Inconsistent patterns (some async, some sync without reason)
 
 ❌ **Documentation Bloat**:
-- 7,800 lines of docs for 900 lines of code is insane
+- Keep docs proportional to code
 - Examples that don't run
 - Planning documents in the repo (JIRA.md, ROADMAP.md)
 
@@ -122,6 +122,6 @@ When working on multiple items, use TodoWrite to track:
 
 The decorator and trace context are why StreamLL exists. Everything else is secondary. If a change might break these, it's not worth it.
 
-Remember: We deleted 92% of the code and the library got BETTER. When in doubt, delete.
+Remember: Simpler code is better code. When in doubt, delete.
 
 **Focus**: Working code > Perfect architecture > Comprehensive docs

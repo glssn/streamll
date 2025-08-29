@@ -52,7 +52,3 @@ class TerminalSink(BaseSink):
             self.output.write(f"[{ts}] ERROR: {error}\n")
         else:
             self.output.write(f"[{ts}] {event.event_type.upper()}: {event.operation}\n")
-
-    def _write_batch(self, events: list[StreamllEvent]) -> None:
-        """Not used - we handle events immediately."""
-        pass
