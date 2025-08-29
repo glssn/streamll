@@ -66,7 +66,7 @@ def _process_stream_chunk(
     return None, None, token_index
 
 
-def create_streaming_wrapper(
+def create_streaming_wrapper(  # noqa: C901
     module: Any,
     signature_field_name: str,
     event_type: str = "token",
@@ -106,7 +106,7 @@ def create_streaming_wrapper(
         logger.warning("Failed to create streaming module: %s", e)
         return module
 
-    def streaming_wrapper(*args, **kwargs):
+    def streaming_wrapper(*args, **kwargs):  # noqa: C901
         """Execute the module with streaming and emit StreamLL events."""
         token_index = 0
         final_result = None
@@ -224,7 +224,7 @@ def _find_predictors_in_module(module_instance: Any, stream_fields: list[str]) -
     return result
 
 
-def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str]) -> Callable:
+def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str]) -> Callable:  # noqa: C901
     """Wrap a forward method to enable token streaming.
 
     This function is used by the @instrument decorator to wrap forward methods
@@ -249,7 +249,7 @@ def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str
         logger.warning(f"DSPy streaming not available: {e}")
         return forward_method
 
-    def streaming_forward(*args, **kwargs):
+    def streaming_forward(*args, **kwargs):  # noqa: C901
         """Execute forward with streaming and emit TokenEvents."""
 
         predictors = _find_predictors_in_module(module_instance, stream_fields)

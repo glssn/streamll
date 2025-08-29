@@ -82,27 +82,27 @@ def redis_client():
     """Provide Redis client for integration tests."""
     if not _is_redis_available():
         pytest.skip("Redis not available")
-    
+
     try:
         import redis
     except ImportError:
         pytest.skip("redis package not installed")
-    
+
     client = redis.Redis(
         host="localhost",
         port=6379,
         decode_responses=True,
         socket_connect_timeout=2,
     )
-    
+
     # Test connection
     try:
         client.ping()
     except redis.ConnectionError:
         pytest.skip("Cannot connect to Redis")
-    
+
     yield client
-    
+
     # Cleanup: flush test database
     if os.getenv("REDIS_TEST_FLUSH", "").lower() == "true":
         client.flushdb()
