@@ -83,6 +83,7 @@ class RabbitMQSink(BaseSink):
             logger.error(
                 "aio-pika not installed. Install with: pip install streamll[rabbitmq-producer]"
             )
+            self._record_failure()
             return
 
         asyncio.set_event_loop(self._loop)
@@ -100,8 +101,10 @@ class RabbitMQSink(BaseSink):
                 )
 
                 logger.info(f"Connected to RabbitMQ at {self.url}")
+                self._record_success()
             except Exception as e:
                 logger.error(f"Failed to connect to RabbitMQ: {e}")
+                self._record_failure()
 
         self._loop.run_until_complete(connect_async())
 
