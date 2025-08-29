@@ -76,3 +76,13 @@ class TestRealLLMStreaming(unittest.TestCase):
         assert len(sink.events) > 0, "Should have captured events"
         assert any(e.event_type == "start" for e in sink.events), "Should have start event"
         assert any(e.event_type == "end" for e in sink.events), "Should have end event"
+        
+        # CRITICAL: Verify we actually got token streaming events
+        assert len(sink.token_events) > 0, f"No token events! Only got: {[e.event_type for e in sink.events]}"
+        assert len(sink.token_events) >= 3, f"Too few tokens ({len(sink.token_events)}), streaming might be broken"
+        
+        # Verify tokens have expected structure
+        first_token = sink.token_events[0]
+        assert "field" in first_token.data, "Token event missing field"
+        assert "token" in first_token.data, "Token event missing token content"
+        assert "token_index" in first_token.data, "Token event missing index"
