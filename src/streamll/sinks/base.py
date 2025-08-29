@@ -93,9 +93,11 @@ class BaseSink(ABC):
             with self._buffer_lock:
                 self._buffer.extend(events)
 
-    @abstractmethod
     def _write_batch(self, events: list[StreamllEvent]) -> None:
         """Write a batch of events to the sink.
+
+        Default implementation writes events immediately one by one.
+        Override this method for batch writing (e.g., Redis pipeline).
 
         Args:
             events: Events to write
@@ -103,7 +105,9 @@ class BaseSink(ABC):
         Raises:
             Exception: If write fails
         """
-        pass
+        # Default: write events one by one
+        for event in events:
+            self.handle_event(event)
 
     def _should_attempt(self) -> bool:
         """Check if we should attempt operation."""
