@@ -143,7 +143,9 @@ def create_streaming_wrapper(  # noqa: C901
 
             # If we got streaming chunks but no final result, try normal execution
             if token_index > 0 and final_result is None:
-                logger.info(f"Got {token_index} streaming chunks, no final result. Attempting normal execution.")
+                logger.info(
+                    f"Got {token_index} streaming chunks, no final result. Attempting normal execution."
+                )
                 try:
                     final_result = module(*args, **kwargs)
                 except Exception as e:
@@ -196,7 +198,9 @@ def _extract_provider_from_chunk(chunk: Any) -> str:
     return "unknown"
 
 
-def _find_predictors_in_module(module_instance: Any, stream_fields: list[str]) -> list[tuple[str, Any, Any]]:
+def _find_predictors_in_module(
+    module_instance: Any, stream_fields: list[str]
+) -> list[tuple[str, Any, Any]]:
     """Find all Predict modules in instance that have fields to stream.
 
     Returns:
@@ -208,7 +212,11 @@ def _find_predictors_in_module(module_instance: Any, stream_fields: list[str]) -
     for name, attr in module_instance.__dict__.items():
         if isinstance(attr, dspy.Predict):
             predictors.append((name, attr, None))
-        elif isinstance(attr, dspy.ChainOfThought) and hasattr(attr, "predict") and isinstance(attr.predict, dspy.Predict):
+        elif (
+            isinstance(attr, dspy.ChainOfThought)
+            and hasattr(attr, "predict")
+            and isinstance(attr.predict, dspy.Predict)
+        ):
             predictors.append(("predict", attr.predict, attr))
 
     # Filter to only those with streamable fields
@@ -262,7 +270,9 @@ def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str
             original_predictors.append((predictor_name, predictor, parent))
 
             # Track token indices per field
-            token_indices = {field: 0 for field in stream_fields if field in predictor.signature.output_fields}
+            token_indices = {
+                field: 0 for field in stream_fields if field in predictor.signature.output_fields
+            }
 
             # Create listeners for each field
             listeners = [StreamListener(signature_field_name=field) for field in token_indices]
@@ -334,4 +344,3 @@ __all__ = [
     "create_streaming_wrapper",
     "wrap_with_streaming",
 ]
-

@@ -119,6 +119,7 @@ def get_execution_id() -> str:
     """Get execution ID from DSPy, streamll context, or generate new."""
     try:
         from dspy.utils.callback import ACTIVE_CALL_ID
+
         if dspy_id := ACTIVE_CALL_ID.get():
             return dspy_id
     except (ImportError, AttributeError):
@@ -191,11 +192,13 @@ class StreamllContext:
 
         # Save parent context for nested traces
         self.parent_context = _execution_context.get(None)
-        _execution_context.set({
-            "execution_id": self.execution_id,
-            "operation": self.operation,
-            "metadata": self.metadata,
-        })
+        _execution_context.set(
+            {
+                "execution_id": self.execution_id,
+                "operation": self.operation,
+                "metadata": self.metadata,
+            }
+        )
 
         # Start local sinks
         for sink in self.local_sinks:
@@ -231,11 +234,13 @@ class StreamllContext:
         }
 
         if exc_type:
-            event_data.update({
-                "error_type": exc_type.__name__,
-                "error_message": str(exc_val),
-                "traceback": "".join(traceback.format_tb(exc_tb)),
-            })
+            event_data.update(
+                {
+                    "error_type": exc_type.__name__,
+                    "error_message": str(exc_val),
+                    "traceback": "".join(traceback.format_tb(exc_tb)),
+                }
+            )
 
         event = StreamllEvent(
             event_id=generate_event_id(),

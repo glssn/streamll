@@ -41,11 +41,9 @@ class ReasoningQA(dspy.Module):
 
 
 # Example 1: Simple streaming
-print("1. Simple answer streaming:\n")
 qa = StreamingQA()
 qa("What is 2+2? Answer in one sentence.")
 
 # Example 2: Multi-field streaming
-print("\n\n2. Reasoning + answer streaming:\n")
 reasoner = ReasoningQA()
 reasoner("If I have 3 apples and buy 2 more, then give 1 away, how many do I have?")

@@ -12,14 +12,12 @@ def main():
         routing_key="events",
     )
     sink.start()
-    
-    with streamll.configure(sinks=[sink]):
-        with streamll.trace("demo_operation") as ctx:
-            ctx.emit("progress", data={"step": 1})
-            ctx.emit("progress", data={"step": 2})
-    
+
+    with streamll.configure(sinks=[sink]), streamll.trace("demo_operation") as ctx:
+        ctx.emit("progress", data={"step": 1})
+        ctx.emit("progress", data={"step": 2})
+
     sink.stop()
-    print("Events sent to RabbitMQ")
 
 
 if __name__ == "__main__":

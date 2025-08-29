@@ -65,18 +65,18 @@ class RabbitMQSink(BaseSink):
         # Don't call super().stop() yet - we need executor for flush
         self.is_running = False
         self.flush()  # Flush before closing connections
-        
+
         if self._executor and not self._executor._shutdown:
             # Close connection if we have one
             if self._connection:
                 try:
                     self._executor.submit(self._disconnect).result(timeout=5)
-                except Exception:
-                    pass  # Connection might already be closed
-            
+                except Exception as e:
+                    logger.debug(f"Error during disconnect: {e}")  # Connection might already be closed
+
             # Shutdown executor
             self._executor.shutdown(wait=True)
-        
+
         if self._loop and not self._loop.is_closed():
             self._loop.close()
 

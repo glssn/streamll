@@ -2,6 +2,7 @@
 """Minimal RabbitMQ consumer example."""
 
 import asyncio
+
 from streamll.consumer.rabbitmq import RabbitMQConsumer
 
 
@@ -11,14 +12,13 @@ async def main():
         exchange="streamll",
         queue="demo",
     )
-    
+
     @consumer.on("*")
     def handle_event(event):
-        print(f"[{event.event_type}] {event.data}")
-    
+        pass
+
     await consumer.start()
-    print("Consuming events (Ctrl+C to stop)...")
-    
+
     try:
         await consumer.consume_forever()
     except KeyboardInterrupt:

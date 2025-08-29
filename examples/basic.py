@@ -31,4 +31,3 @@ class SimpleQA(dspy.Module):
 # Use the module - events are automatically emitted to terminal
 qa = SimpleQA()
 result = qa("What is 2+2?")
-print(f"\nAnswer: {result.answer}")
