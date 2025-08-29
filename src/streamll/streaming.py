@@ -16,7 +16,7 @@ def _process_stream_chunk(
     signature_field_name: str,
     token_index: int,
     event_type: str,
-    operation: str,
+    operation: str | None,
     streaming_mode: str,
 ) -> tuple[str | None, Any | None, int]:
     """Process a single stream chunk and emit appropriate events.
@@ -123,13 +123,13 @@ def create_streaming_wrapper(  # noqa: C901
                     from dspy.streaming import apply_sync_streaming
 
                     if inspect.isasyncgen(stream_iterator) or hasattr(stream_iterator, "__aiter__"):
-                        stream_iterator = apply_sync_streaming(stream_iterator)
+                        stream_iterator = apply_sync_streaming(stream_iterator)  # type: ignore[arg-type]
                         streaming_mode = "real_dspy_async"
                 except ImportError:
                     logger.warning("DSPy async streaming conversion not available")
 
             # Process stream chunks
-            for chunk in stream_iterator:
+            for chunk in stream_iterator:  # type: ignore[union-attr]
                 _, final_result, token_index = _process_stream_chunk(
                     chunk,
                     signature_field_name,
