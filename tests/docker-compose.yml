@@ -1,0 +1,44 @@
+# Modern docker-compose format - no version needed
+
+services:
+  redis-test:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_test_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      
+  rabbitmq-test:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"  # Management UI
+    volumes:
+      - rabbitmq_test_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nats-test:
+    image: nats:alpine
+    command: -js  # Enable JetStream
+    ports:
+      - "4222:4222"
+      - "8222:8222"  # Monitoring
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  redis_test_data:
+  rabbitmq_test_data:

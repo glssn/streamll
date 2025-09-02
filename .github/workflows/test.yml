@@ -1,0 +1,102 @@
+name: Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.13"]  # Min and max supported versions
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          uv sync --all-extras --dev
+          uv pip install -e .
+
+      - name: Run linting
+        run: uv run ruff check . --ignore=T201,SIM117
+
+      - name: Run unit tests
+        run: |
+          uv run pytest tests/unit -xvs --cov=src/streamll --cov-fail-under=40
+        env:
+          PYTHONPATH: .
+
+      - name: Start test infrastructure
+        run: |
+          docker compose -f .github/docker-compose.test.yml up -d redis
+
+          # Wait for Redis
+          timeout 30 bash -c 'until docker exec $(docker ps -qf "name=redis") redis-cli ping 2>/dev/null; do sleep 1; done'
+          echo "Redis is ready"
+
+      - name: Run integration tests
+        run: |
+          export REDIS_URL="redis://localhost:6379"
+          uv run pytest tests/integration -v --tb=short
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+
+      - name: Stop test infrastructure
+        if: always()
+        run: docker compose -f .github/docker-compose.test.yml down -v
+
+  examples:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install package
+        run: |
+          uv sync --all-extras
+          uv pip install -e .
+
+      - name: Test example syntax
+        run: |
+          # Test all examples have valid syntax
+          for example in examples/*.py; do
+            echo "Testing syntax: $example"
+            uv run python -m py_compile "$example"
+          done
+
+      - name: Test examples can import
+        env:
+          OPENROUTER_API_KEY: mock-key-for-testing
+          GEMINI_API_KEY: mock-key-for-testing
+        run: |
+          # Test examples can import without API calls
+          for example in examples/*.py; do
+            echo "Testing imports: $example"
+            uv run python -c "import sys; sys.path.insert(0, 'examples'); exec(open('$example').read().split('if __name__')[0]); print('✓ imported')"
+          done
+
+      - name: Run example tests
+        run: uv run pytest tests/test_examples.py -v --no-cov

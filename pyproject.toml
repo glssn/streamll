@@ -1,0 +1,93 @@
+[project]
+name = "streamll"
+version = "0.1.0"
+description = "Production Streaming Infrastructure for DSPy"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    # Core only - zero dependencies for schemas
+    # Everything else is optional
+]
+authors = [
+    {name = "Nick", email = "nick@glssn.co.uk"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.11+",
+]
+keywords = ["dspy", "streaming", "llm", "observability", "ai"]
+
+[project.urls]
+Homepage = "https://github.com/glssn/streamll"
+Repository = "https://github.com/glssn/streamll"
+Issues = "https://github.com/glssn/streamll/issues"
+
+[project.optional-dependencies]
+# Production sinks
+redis = [
+    "dspy>=2.7.0,<4.0.0",
+    "faststream[redis]>=0.5.0",
+    "pydantic>=2.0",
+    "nanoid>=2.0",
+]
+rabbitmq = [
+    "dspy>=2.7.0,<4.0.0", 
+    "faststream[rabbit]>=0.5.0",
+    "pydantic>=2.0",
+    "nanoid>=2.0",
+]
+terminal = [
+    "dspy>=2.7.0,<4.0.0",
+    "rich>=14.1.0",
+    "pydantic>=2.0",
+    "nanoid>=2.0",
+]
+
+# Everything
+all = ["streamll[redis,rabbitmq,terminal]"]
+
+# Development dependencies
+dev = [
+    "streamll[all]",
+    "pytest>=7.4",
+    "pytest-asyncio>=0.21",
+    "pytest-cov>=4.1",
+    "pytest-timeout>=2.1",
+    "pytest-mock>=3.11",
+    "hypothesis>=6.88",
+    "fakeredis>=2.20",
+    "ruff>=0.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = """
+    -ra
+    --strict-markers
+    --cov=src/streamll
+    --cov-report=term-missing
+    --cov-report=html
+"""
+# TODO: Enable when implementation starts
+# --cov-fail-under=80
+markers = [
+    "unit: marks tests as unit tests (fast, no external dependencies)",
+    "integration: marks tests as integration tests (require real infrastructure)",
+    "redis: marks tests that require Redis",
+    "rabbitmq: marks tests that require RabbitMQ",
+]
+
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]  # Allow assert in tests
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

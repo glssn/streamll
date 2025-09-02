@@ -1,0 +1,64 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Environment & Configuration
+.env
+.env.*
+.python-version
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Development & Debug files
+*.log
+*.tmp
+debug_*.py
+*_debug.*
+
+# Cache directories
+.ruff_cache/
+.mypy_cache/
+.hypothesis/
+
+# Documentation builds
+docs/_build/
+site/
+
+# Redis & database files
+dump.rdb
+*.db
+*.sqlite
+*.sqlite3
+
+# Jupyter notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# Package manager files
+uv.lock
+poetry.lock
+Pipfile.lock
