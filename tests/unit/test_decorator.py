@@ -1,19 +1,12 @@
-"""Unit tests for @streamll.instrument decorator."""
-
 import dspy
 import pytest
 
 import streamll
-from tests.fixtures.mock_dspy import setup_mock_dspy
 from tests.test_helpers import EventCapturingSink
 
 
 class TestInstrumentDecorator:
-    """Test the @streamll.instrument decorator."""
-
     def test_decorator_on_class(self):
-        """Test @instrument can decorate a DSPy module class."""
-        setup_mock_dspy()
 
         @streamll.instrument
         class InstrumentedModule(dspy.Module):
@@ -29,8 +22,6 @@ class TestInstrumentDecorator:
         assert hasattr(module, "forward")
 
     def test_decorator_captures_events(self):
-        """Test @instrument captures module execution events."""
-        setup_mock_dspy()
         sink = EventCapturingSink()
         sink.start()
 
@@ -53,9 +44,6 @@ class TestInstrumentDecorator:
         assert result["result"] == 10
 
     def test_decorator_preserves_module_behavior(self):
-        """Test @instrument doesn't break module functionality."""
-        setup_mock_dspy()
-
         class PlainModule(dspy.Module):
             def forward(self, x, y):
                 return x + y
@@ -71,8 +59,6 @@ class TestInstrumentDecorator:
         assert plain(3, 4) == decorated(3, 4)
 
     def test_decorator_with_exception(self):
-        """Test @instrument handles exceptions properly."""
-        setup_mock_dspy()
         sink = EventCapturingSink()
         sink.start()
 
@@ -95,8 +81,6 @@ class TestInstrumentDecorator:
         assert len(error_events) > 0
 
     def test_decorator_with_nested_modules(self):
-        """Test @instrument works with nested DSPy modules."""
-        setup_mock_dspy()
         sink = EventCapturingSink()
         sink.start()
 
@@ -124,8 +108,6 @@ class TestInstrumentDecorator:
         assert len(sink.events) > 0
 
     def test_decorator_multiple_instances(self):
-        """Test multiple instances of decorated modules work independently."""
-        setup_mock_dspy()
         sink = EventCapturingSink()
         sink.start()
 
@@ -154,9 +136,6 @@ class TestInstrumentDecorator:
         assert len(sink.events) >= 3
 
     def test_decorator_can_be_applied_to_dspy_predict(self):
-        """Test @instrument can be applied to dspy.Predict subclass (decorator acceptance)."""
-        setup_mock_dspy()
-
         @streamll.instrument
         class InstrumentedPredict(dspy.Predict):
             pass

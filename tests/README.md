@@ -1,6 +1,6 @@
 # Tests
 
-## Quick Start
+## Quick start
 
 ```bash
 # Unit tests (no infrastructure needed)
@@ -13,17 +13,17 @@ uv run pytest -m integration
 uv run pytest
 ```
 
-## Test Categories
+## Test categories
 
-**Unit Tests** (`-m unit`)
+**Unit tests** (`-m unit`)
 - Fast, no external dependencies
 - Mock all external connections
 
-**Integration Tests** (`-m integration`)
+**Integration tests** (`-m integration`)
 - Requires Redis/RabbitMQ running
 - Tests complete event flow through real systems
 
-## Infrastructure Setup
+## Infrastructure setup
 
 ```bash
 # Start test infrastructure
@@ -33,13 +33,13 @@ docker-compose -f tests/docker-compose.yml up -d
 docker-compose -f tests/docker-compose.yml down
 ```
 
-## Running Specific Tests
+## Running specific tests
 
 ```bash
 # Redis tests only
 uv run pytest -m redis
 
-# RabbitMQ tests only  
+# RabbitMQ tests only
 uv run pytest -m rabbitmq
 
 # Single test file
@@ -52,7 +52,7 @@ uv run pytest -v
 uv run pytest --pdb
 ```
 
-## Environment Variables
+## Environment variables
 
 ```bash
 # Optional: Override default URLs

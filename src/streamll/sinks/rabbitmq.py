@@ -1,6 +1,7 @@
 from typing import Any
 
-from streamll.brokers import create_broker
+from faststream.rabbit import RabbitBroker
+
 from streamll.models import StreamllEvent
 
 
@@ -12,21 +13,29 @@ class RabbitMQSink:
         exchange: str = "",
         **broker_kwargs: Any,
     ):
-        self._broker = create_broker(rabbitmq_url, **broker_kwargs)
+        self.broker = RabbitBroker(rabbitmq_url, **broker_kwargs)
         self.queue = queue
         self.exchange = exchange
         self.is_running = False
+        self._connected = False
 
-    def start(self) -> None:
+    async def start(self) -> None:
+        if not self._connected:
+            await self.broker.connect()
+            self._connected = True
         self.is_running = True
 
-    def stop(self) -> None:
+    async def stop(self) -> None:
         self.is_running = False
+        if self._connected:
+            await self.broker.stop()
+            self._connected = False
 
     async def handle_event(self, event: StreamllEvent) -> None:
-        """Publish event - let FastStream handle Pydantic serialization."""
         if not self.is_running:
             return
 
-        async with self._broker:
-            await self._broker.publish(event, queue=self.queue)
+        if not self._connected:
+            await self.start()
+
+        await self.broker.publish(event, queue=self.queue)

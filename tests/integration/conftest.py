@@ -1,5 +1,3 @@
-"""Shared fixtures for integration tests."""
-
 import time
 
 import pytest
@@ -9,7 +7,6 @@ from streamll.models import StreamllEvent
 
 @pytest.fixture
 def sample_integration_event():
-    """Sample event for integration tests."""
     return StreamllEvent(
         execution_id="integration-test-001",
         event_type="test",
@@ -20,7 +17,6 @@ def sample_integration_event():
 
 
 def pytest_configure(config):
-    """Configure pytest markers."""
     config.addinivalue_line(
         "markers", "integration: Integration tests requiring real infrastructure"
     )

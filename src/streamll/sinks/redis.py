@@ -1,6 +1,7 @@
 from typing import Any
 
-from streamll.brokers import create_broker
+from faststream.redis import RedisBroker
+
 from streamll.models import StreamllEvent
 
 
@@ -11,21 +12,30 @@ class RedisSink:
         stream_key: str = "streamll_events",
         **broker_kwargs: Any,
     ):
-        self._broker = create_broker(redis_url, **broker_kwargs)
+        self.broker = RedisBroker(redis_url, **broker_kwargs)
         self.stream_key = stream_key
         self.is_running = False
+        self._connected = False
 
-    def start(self) -> None:
+    async def start(self) -> None:
+        if not self._connected:
+            await self.broker.connect()
+            self._connected = True
         self.is_running = True
 
-    def stop(self) -> None:
+    async def stop(self) -> None:
         self.is_running = False
+        if self._connected:
+            await self.broker.stop()
+            self._connected = False
 
     async def handle_event(self, event: StreamllEvent) -> None:
-        """Publish event - let FastStream handle Pydantic serialization."""
         if not self.is_running:
             return
 
-        async with self._broker:
-            event_dict = event.model_dump()
-            await self._broker.publish(event_dict, stream=self.stream_key)
+        if not self._connected:
+            await self.start()
+
+        event_dict = event.model_dump()
+        await self.broker.publish(event_dict, stream=self.stream_key)
+

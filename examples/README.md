@@ -1,8 +1,8 @@
-# streamll Examples
+# streamll examples
 
 These examples use [uv's inline script dependencies](https://docs.astral.sh/uv/guides/scripts/#declaring-script-dependencies) for automatic dependency management.
 
-## Running Examples
+## Running examples
 
 Make sure you have [uv installed](https://docs.astral.sh/uv/getting-started/installation/), then:
 

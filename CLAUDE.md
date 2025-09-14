@@ -36,8 +36,8 @@ with streamll.trace("operation") as ctx:
 ```
 
 ### 3. Production Sinks
-- **TerminalSink**: For development (not "SimpleTerm..." or "BasicTerm...")
-- **RedisSink**: For production with buffering
+- **TerminalSink**: For development
+- **RedisSink**: For production (uses FastStream's built-in reliability)
 - **RabbitMQSink**: For message queue integration
 
 ## Red Flags (Stop immediately if you catch yourself)

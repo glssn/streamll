@@ -2,17 +2,25 @@
 
 Production-ready streaming for DSPy applications.
 
-Stream every step of your AI application - like retrieval, reasoning and token generation — directly into Redis, RabbitMQ, and your existing event infrastructure.
+Stream every step of your AI application - like retrieval, reasoning and token generation - directly into Redis, RabbitMQ, and your existing event infrastructure.
 
-## Quick Start
+## Installation
 
 ```bash
-# Using uv (recommended)
+# Basic (terminal output only)
 uv add streamll
 
-# Or using pip
-pip install streamll
+# With Redis for production
+uv add "streamll[redis]"
+
+# With RabbitMQ
+uv add "streamll[rabbitmq]"
+
+# Everything
+uv add "streamll[all]"
 ```
+
+## Quick start
 
 [![asciicast](https://asciinema.org/a/Lu7QCpvNtrShpYuq9riDx2CTr.svg)](https://asciinema.org/a/Lu7QCpvNtrShpYuq9riDx2CTr)
 
@@ -29,47 +37,48 @@ class QA(dspy.Module):
     def forward(self, question):
         return self.generate(question=question)
 
-# Configure DSPy  
+# Configure DSPy
 dspy.configure(lm=dspy.LM("openai/gpt-4o-mini"))
 
 qa = QA()
 result = qa("Explain quantum computing")
 ```
 
-### Class-based Signatures
+## Production use
+
+Send events to Redis or RabbitMQ instead of the terminal:
 
 ```python
-class Analysis(dspy.Signature):
-    """Analyze text sentiment."""
-    text: str = dspy.InputField()
-    analysis: str = dspy.OutputField()
+from streamll.sinks import RedisSink
 
-@streamll.instrument(stream_fields=["analysis"])
-class Analyzer(dspy.Module):
+sink = RedisSink(redis_url="redis://localhost:6379", stream_key="ml_events")
+
+@streamll.instrument(sinks=[sink], stream_fields=["answer"])
+class QA(dspy.Module):
     def __init__(self):
-        self.analyze = dspy.Predict(Analysis)
+        self.generate = dspy.ChainOfThought("question -> answer")
 
-    def forward(self, text):
-        return self.analyze(text=text)
+    def forward(self, question):
+        return self.generate(question=question)
 ```
 
-## Production Sinks
+Consume events in another service:
 
-### Redis Streams
 ```python
-sink = streamll.RedisSink(url="redis://localhost:6379")
-streamll.configure(sinks=[sink])
+from streamll import EventConsumer
+
+consumer = EventConsumer("redis://localhost:6379", target="ml_events")
+
+@consumer.on("token")
+async def handle_token(event):
+    print(event.data["token"], end="", flush=True)
+
+await consumer.run()
 ```
 
-### RabbitMQ
-```python
-sink = streamll.RabbitMQSink(url="amqp://localhost:5672")
-streamll.configure(sinks=[sink])
-```
+## Custom events
 
-*NATS and Kafka support coming soon.*
-
-## Custom Events
+Emit custom events within your processing:
 
 ```python
 @streamll.instrument
@@ -77,33 +86,33 @@ class RAGPipeline(dspy.Module):
     def forward(self, question):
         with streamll.trace("retrieval") as ctx:
             docs = self.retrieve(question)
-            ctx.emit("docs_found", count=len(docs))
+            ctx.emit("docs_found", data={"count": len(docs)})
 
         answer = self.generate(docs=docs, question=question)
         return answer
 ```
 
-## Features
+## Event correlation
 
-- **Token streaming** - Real-time LLM output
-- **Auto buffering** - Never lose events
-- **Circuit breakers** - Graceful degradation
-- **Zero overhead** - Async, non-blocking
+Attach correlation IDs that persist across all events:
 
-## Installation
+```python
+# In your API handler
+streamll.set_context(
+    conversation_id="conv_123",
+    request_id="req_456"
+)
 
-```bash
-# Basic (terminal output only)
-uv add streamll
+# All subsequent events include this context
+qa = QA()
+result = qa("What is quantum computing?")
 
-# With Redis for production
-uv add "streamll[redis]"
-
-# With RabbitMQ  
-uv add "streamll[rabbitmq]"
-
-# Everything
-uv add "streamll[all]"
+# Consumer can filter by context
+@consumer.on("token")
+async def handle_token(event):
+    if event.data.get("conversation_id") == "conv_123":
+        # Handle this specific conversation
+        pass
 ```
 
 ## Development
@@ -114,6 +123,9 @@ uv run pytest
 
 # With coverage
 uv run pytest --cov=src/streamll
+
+# Start test services (Redis, RabbitMQ)
+docker-compose -f tests/docker-compose.yml up -d
 ```
 
 ## License

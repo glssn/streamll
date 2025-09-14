@@ -1,10 +1,12 @@
 import sys
+from io import TextIOWrapper
+from typing import TextIO
 
 from streamll.models import StreamllEvent
 
 
 class TerminalSink:
-    def __init__(self, show_tokens: bool = True, output=None):
+    def __init__(self, show_tokens: bool = True, output: TextIO | TextIOWrapper | None = None):
         self.show_tokens = show_tokens
         self.output = output or sys.stdout
         self.is_running = False

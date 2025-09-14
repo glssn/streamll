@@ -1,5 +1,3 @@
-"""Unit tests for streamll.trace() context manager."""
-
 import time
 
 import pytest
@@ -9,10 +7,7 @@ from tests.test_helpers import EventCapturingSink
 
 
 class TestTraceContext:
-    """Test streamll.trace() context manager."""
-
     def test_trace_basic_usage(self):
-        """Test basic trace context usage."""
         sink = EventCapturingSink()
         sink.start()
 
@@ -29,7 +24,6 @@ class TestTraceContext:
         assert sink.events[1].operation == "test_op"
 
     def test_trace_with_custom_events(self):
-        """Test emitting custom events within trace."""
         sink = EventCapturingSink()
         sink.start()
 
@@ -48,7 +42,6 @@ class TestTraceContext:
         assert sink.events[3].event_type == "end"
 
     def test_trace_with_exception(self):
-        """Test trace handles exceptions properly."""
         sink = EventCapturingSink()
         sink.start()
 
@@ -64,7 +57,6 @@ class TestTraceContext:
         assert "Test error" in sink.events[1].data["error_message"]
 
     def test_trace_nested_contexts(self):
-        """Test nested trace contexts."""
         sink = EventCapturingSink()
         sink.start()
 
@@ -81,7 +73,6 @@ class TestTraceContext:
         assert event_types == ["start", "outer_event", "start", "inner_event", "end", "end"]
 
     def test_trace_execution_id(self):
-        """Test that events within a trace share execution_id."""
         sink = EventCapturingSink()
         sink.start()
 
@@ -96,7 +87,6 @@ class TestTraceContext:
         assert all(e.execution_id == exec_id for e in sink.events)
 
     def test_trace_operation_name(self):
-        """Test operation name is properly set."""
         sink = EventCapturingSink()
         sink.start()
 
@@ -108,7 +98,6 @@ class TestTraceContext:
         assert all(e.operation == "my_operation" for e in sink.events)
 
     def test_trace_timing_metadata(self):
-        """Test trace captures timing information."""
         sink = EventCapturingSink()
         sink.start()
 
@@ -126,14 +115,12 @@ class TestTraceContext:
         assert duration >= 0.04  # Allow some tolerance
 
     def test_trace_without_configuration(self):
-        """Test trace works even without sinks configured."""
         # Should not raise error
         with streamll.trace("no_sink_op") as ctx:
             ctx.emit("test")
             pass
 
     def test_trace_data_passthrough(self):
-        """Test trace passes through additional data."""
         sink = EventCapturingSink()
         sink.start()
 

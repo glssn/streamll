@@ -1,23 +1,15 @@
-"""Sink implementations for streamll event output."""
-
 from streamll.sinks.terminal import TerminalSink
 
-__all__ = [
-    "TerminalSink",
-]
+__all__ = ["TerminalSink"]
 
-# Optional Redis sink if dependencies available
 try:
-    from streamll.sinks.redis import RedisSink  # noqa: F401
-
-    __all__.append("RedisSink")
+    from streamll.sinks.redis import RedisSink
+    __all__ += ["RedisSink"]
 except ImportError:
-    pass  # Redis dependencies not installed
+    pass
 
-# Optional RabbitMQ sink if dependencies available
 try:
-    from streamll.sinks.rabbitmq import RabbitMQSink  # noqa: F401
-
-    __all__.append("RabbitMQSink")
+    from streamll.sinks.rabbitmq import RabbitMQSink
+    __all__ += ["RabbitMQSink"]
 except ImportError:
-    pass  # RabbitMQ dependencies not installed
+    pass

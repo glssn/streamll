@@ -1,5 +1,3 @@
-"""Integration tests for real LLM token streaming."""
-
 import os
 import unittest
 
@@ -7,25 +5,16 @@ import dspy
 import pytest
 
 import streamll
+from tests.test_helpers import EventCapturingSink
 
 
-class TokenCapturingSink:
-    """Sink that captures token events for testing."""
-
+class TokenCapturingSink(EventCapturingSink):
     def __init__(self):
-        self.events = []
+        super().__init__()
         self.token_events = []
-        self.is_running = False
-
-    def start(self):
-        self.is_running = True
-
-    def stop(self):
-        self.is_running = False
 
     def handle_event(self, event):
-        """Capture events, especially token events."""
-        self.events.append(event)
+        super().handle_event(event)
         if event.event_type == "token":
             self.token_events.append(event)
 
@@ -33,7 +22,6 @@ class TokenCapturingSink:
 class TestRealLLMStreaming(unittest.TestCase):
     @pytest.mark.integration
     def test_openrouter_streaming(self):
-        """Test streaming with OpenRouter."""
         # Fail if API key missing
         if not os.getenv("OPENROUTER_API_KEY"):
             pytest.fail("OPENROUTER_API_KEY environment variable required for this test")
@@ -80,7 +68,6 @@ class TestRealLLMStreaming(unittest.TestCase):
 
     @pytest.mark.integration
     def test_instrument_dspy_predict_directly(self):
-        """Test @instrument works directly on dspy.Predict subclass with real LLM."""
         if not os.getenv("OPENROUTER_API_KEY"):
             pytest.fail("OPENROUTER_API_KEY environment variable required for this test")
 

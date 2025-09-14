@@ -1,15 +1,10 @@
-"""Unit tests for StreamllEvent model."""
-
 from datetime import UTC, datetime
 
 from streamll.models import StreamllEvent, generate_event_id
 
 
 class TestStreamllEvent:
-    """Test the StreamllEvent model."""
-
     def test_event_creation(self):
-        """Test creating a basic event."""
         event = StreamllEvent(execution_id="test_exec", event_type="start", operation="test_op")
 
         assert event.execution_id == "test_exec"
@@ -19,7 +14,6 @@ class TestStreamllEvent:
         assert isinstance(event.timestamp, datetime)
 
     def test_event_defaults(self):
-        """Test event field defaults."""
         event = StreamllEvent(execution_id="test", event_type="custom")
 
         assert event.module_name == "unknown"
@@ -28,7 +22,6 @@ class TestStreamllEvent:
         assert event.tags == {}
 
     def test_event_with_data(self):
-        """Test event with custom data."""
         event = StreamllEvent(
             execution_id="test", event_type="custom", data={"key": "value", "count": 42}
         )
@@ -37,7 +30,6 @@ class TestStreamllEvent:
         assert event.data["count"] == 42
 
     def test_event_with_tags(self):
-        """Test event with tags."""
         event = StreamllEvent(
             execution_id="test", event_type="custom", tags={"env": "test", "user": "alice"}
         )
@@ -46,7 +38,6 @@ class TestStreamllEvent:
         assert event.tags["user"] == "alice"
 
     def test_event_id_generation(self):
-        """Test event ID is unique."""
         id1 = generate_event_id()
         id2 = generate_event_id()
 
@@ -55,7 +46,6 @@ class TestStreamllEvent:
         assert len(id2) == 12
 
     def test_event_timestamp(self):
-        """Test event timestamp is timezone-aware."""
         event = StreamllEvent(execution_id="test", event_type="test")
 
         assert event.timestamp.tzinfo is not None

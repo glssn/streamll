@@ -1,5 +1,3 @@
-"""Shared test fixtures and configuration for streamll tests."""
-
 import asyncio
 import os
 import socket
@@ -11,7 +9,6 @@ from streamll.models import StreamllEvent
 
 @pytest.fixture(scope="session")
 def event_loop():
-    """Create event loop for async tests."""
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
@@ -19,7 +16,6 @@ def event_loop():
 
 @pytest.fixture
 def sample_event():
-    """Sample StreamllEvent for testing."""
     return StreamllEvent(
         execution_id="test_exec_123",
         event_type="start",
@@ -31,7 +27,6 @@ def sample_event():
 
 @pytest.fixture
 def sample_events():
-    """List of sample StreamllEvents for testing."""
     return [
         StreamllEvent(
             execution_id="exec_1",
@@ -56,7 +51,6 @@ def sample_events():
 
 @pytest.fixture
 def sample_event_data():
-    """Sample event data for testing."""
     return {
         "event_type": "token",
         "module_name": "TestModule",
@@ -66,7 +60,6 @@ def sample_event_data():
 
 # Redis fixtures using streamll interfaces
 def _is_service_available(host: str = "localhost", port: int = 6379) -> bool:
-    """Check if service is available via socket connection."""
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(1)
@@ -79,7 +72,6 @@ def _is_service_available(host: str = "localhost", port: int = 6379) -> bool:
 
 @pytest.fixture(scope="function")
 def redis_client():
-    """Provide Redis client for integration tests."""
     if not _is_service_available("localhost", 6379):
         pytest.skip("Redis not available")
 

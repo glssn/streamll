@@ -1,5 +1,3 @@
-"""Unit tests for TerminalSink."""
-
 import io
 
 from streamll.models import StreamllEvent
@@ -7,16 +5,12 @@ from streamll.sinks.terminal import TerminalSink
 
 
 class TestTerminalSink:
-    """Test the TerminalSink."""
-
     def test_terminal_sink_creation(self):
-        """Test creating a terminal sink."""
         sink = TerminalSink()
         assert sink is not None
         assert not sink.is_running
 
     def test_terminal_sink_start_stop(self):
-        """Test starting and stopping terminal sink."""
         sink = TerminalSink()
 
         sink.start()
@@ -26,7 +20,6 @@ class TestTerminalSink:
         assert not sink.is_running
 
     def test_terminal_sink_handles_event(self):
-        """Test terminal sink handles events."""
         output = io.StringIO()
         sink = TerminalSink(output=output)
         sink.start()
@@ -49,7 +42,6 @@ class TestTerminalSink:
         sink.stop()
 
     def test_terminal_sink_formats_events(self):
-        """Test terminal sink formats different event types."""
         sink = TerminalSink()
         sink.start()
 
@@ -68,7 +60,6 @@ class TestTerminalSink:
         sink.stop()
 
     def test_terminal_sink_flush(self):
-        """Test terminal sink flush does nothing (no buffering)."""
         sink = TerminalSink()
         sink.start()
 

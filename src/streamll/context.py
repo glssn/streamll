@@ -1,5 +1,3 @@
-"""Context management for streamll event emission."""
-
 import logging
 import time
 import traceback
@@ -13,56 +11,54 @@ from streamll.models import StreamllEvent, generate_event_id
 
 logger = logging.getLogger(__name__)
 
-# Global context for current execution
 _execution_context: ContextVar[dict[str, Any] | None] = ContextVar("execution_context")
-
-# Sink configuration
-_module_sinks: dict[int, list[Any]] = {}  # module instance id -> sinks
-_shared_sinks: list[Any] = []  # Shared sinks
+_conversation_context: ContextVar[dict[str, Any] | None] = ContextVar("conversation_context")
+_module_sinks: dict[int, list[Any]] = {}
+_shared_sinks: list[Any] = []
 _global_event_filter: set[str] | None = None
 
 
 def _validate_and_start_sinks(sinks: list[Any]) -> None:
-    """Validate sinks and start them."""
     for sink in sinks:
-        # All sinks must have handle_event, start, stop methods
         if not hasattr(sink, "handle_event"):
             raise TypeError(f"Sink {sink} must have handle_event method")
-        if not hasattr(sink, "start"):
-            raise TypeError(f"Sink {sink} must have start method")
-        if not hasattr(sink, "stop"):
-            raise TypeError(f"Sink {sink} must have stop method")
         if hasattr(sink, "is_running") and not sink.is_running:
-            sink.start()
+            if hasattr(sink, "start"):
+                result = sink.start()
+                if hasattr(result, "__await__"):
+                    import asyncio
+
+                    try:
+                        asyncio.get_running_loop()
+                        logger.warning(
+                            f"Cannot start async sink {type(sink).__name__} from sync context"
+                        )
+                    except RuntimeError:
+                        asyncio.run(result)
 
 
 def _emit_to_sinks(event: StreamllEvent, sinks: list[Any]) -> None:
-    """Emit event to a list of sinks with error handling."""
     import asyncio
     import inspect
-    
+
     for sink in sinks:
         if hasattr(sink, "is_running") and sink.is_running:
             try:
                 result = sink.handle_event(event)
-                # If handle_event returns a coroutine, it's async - run it
                 if inspect.iscoroutine(result):
                     try:
-                        # Check if we're in an async context
                         try:
                             asyncio.get_running_loop()
-                            # We're in an async context - create a new thread to run the coroutine
                             import concurrent.futures
-                            
+
                             def run_in_thread():
                                 return asyncio.run(result)
-                            
+
                             with concurrent.futures.ThreadPoolExecutor() as executor:
                                 future = executor.submit(run_in_thread)
-                                future.result(timeout=5.0)  # 5 second timeout
-                                
+                                future.result(timeout=5.0)
+
                         except RuntimeError:
-                            # Not in an async context - can use asyncio.run directly
                             asyncio.run(result)
                     except Exception as e:
                         logger.warning(f"Async sink {type(sink).__name__} failed: {e}")
@@ -71,8 +67,6 @@ def _emit_to_sinks(event: StreamllEvent, sinks: list[Any]) -> None:
 
 
 class ConfigurationContext:
-    """Context manager for temporary sink configuration."""
-
     def __init__(self, sinks: list[Any] | None = None, event_filter: set[str] | None = None):
         self.sinks = sinks or []
         self.event_filter = event_filter
@@ -113,16 +107,6 @@ class ConfigurationContext:
 def configure(
     sinks: list[Any] | None = None, event_filter: set[str] | None = None, permanent: bool = False
 ) -> ConfigurationContext:
-    """Configure streamll settings.
-
-    Args:
-        sinks: List of sink instances
-        event_filter: Set of event types to emit (None = all)
-        permanent: If True, configure permanently
-
-    Returns:
-        ConfigurationContext for use as context manager
-    """
     global _shared_sinks, _global_event_filter
 
     if permanent:
@@ -137,13 +121,22 @@ def configure(
 
 
 def configure_module(instance: Any, sinks: list[Any]) -> None:
-    """Configure sinks for specific module instance."""
     _validate_and_start_sinks(sinks)
     _module_sinks[id(instance)] = sinks
 
 
+def set_context(**context: Any) -> None:
+    _conversation_context.set(context)
+
+
+def get_conversation_context() -> dict[str, Any]:
+    try:
+        return _conversation_context.get() or {}
+    except LookupError:
+        return {}
+
+
 def get_execution_id() -> str:
-    """Get execution ID from DSPy, streamll context, or generate new."""
     try:
         from dspy.utils.callback import ACTIVE_CALL_ID
 
@@ -165,7 +158,6 @@ def emit(
     data: dict[str, Any] | None = None,
     **kwargs,
 ) -> None:
-    """Emit an event to configured sinks."""
     event = StreamllEvent(
         execution_id=get_execution_id(),
         event_type=event_type,
@@ -177,7 +169,6 @@ def emit(
 
 
 def emit_event(event: StreamllEvent, module_instance: Any | None = None) -> None:
-    """Emit event to configured sinks."""
     if _global_event_filter and event.event_type not in _global_event_filter:
         return
 
@@ -190,13 +181,6 @@ def emit_event(event: StreamllEvent, module_instance: Any | None = None) -> None
 
 
 class StreamllContext:
-    """Context manager for manual event tracing.
-
-    Example:
-        with streamll.trace("operation_name"):
-            do_work()
-    """
-
     def __init__(
         self,
         operation: str,
@@ -213,11 +197,9 @@ class StreamllContext:
         self.parent_context = None
 
     def __enter__(self) -> "StreamllContext":
-        """Enter context - emit start event."""
         self.execution_id = generate_event_id()
         self.start_time = time.time()
 
-        # Save parent context for nested traces
         self.parent_context = _execution_context.get(None)
         _execution_context.set(
             {
@@ -227,12 +209,10 @@ class StreamllContext:
             }
         )
 
-        # Start local sinks
         for sink in self.local_sinks:
             if hasattr(sink, "is_running") and not sink.is_running:
                 sink.start()
 
-        # Emit START event
         start_event = StreamllEvent(
             event_id=generate_event_id(),
             execution_id=self.execution_id,
@@ -250,7 +230,6 @@ class StreamllContext:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        """Exit context - emit end/error event."""
         duration = time.time() - self.start_time
 
         event_data = {
@@ -282,20 +261,18 @@ class StreamllContext:
         emit_event(event)
         _emit_to_sinks(event, self.local_sinks)
 
-        # Restore parent context
         _execution_context.set(self.parent_context)
 
     def emit(self, event_type: str, data: dict[str, Any] | None = None, **kwargs) -> None:
-        """Emit event within this context - just use global emit."""
+        context_data = get_conversation_context()
         emit(
             event_type=event_type,
             operation=self.operation,
             module_name=self.module_name,
             method_name=self.operation,
-            data={**self.metadata, **(data or {}), **kwargs},
+            data={**context_data, **self.metadata, **(data or {}), **kwargs},
         )
 
 
 def trace(operation: str, **kwargs) -> StreamllContext:
-    """Create a trace context for manual instrumentation."""
     return StreamllContext(operation, **kwargs)

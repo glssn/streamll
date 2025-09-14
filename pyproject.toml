@@ -5,8 +5,8 @@ description = "Production Streaming Infrastructure for DSPy"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    # Core only - zero dependencies for schemas
-    # Everything else is optional
+    "pydantic>=2.0",
+    "nanoid>=2.0",
 ]
 authors = [
     {name = "Nick", email = "nick@glssn.co.uk"}
@@ -37,15 +37,13 @@ rabbitmq = [
     "pydantic>=2.0",
     "nanoid>=2.0",
 ]
-terminal = [
+# Terminal sink is built-in, only needs DSPy
+basic = [
     "dspy>=2.7.0,<4.0.0",
-    "rich>=14.1.0",
-    "pydantic>=2.0",
-    "nanoid>=2.0",
 ]
 
 # Everything
-all = ["streamll[redis,rabbitmq,terminal]"]
+all = ["streamll[basic,redis,rabbitmq]"]
 
 # Development dependencies
 dev = [
