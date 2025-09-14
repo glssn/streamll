@@ -22,9 +22,7 @@ class TestEvent:
         assert event.tags == {}
 
     def test_event_with_data(self):
-        event = Event(
-            execution_id="test", event_type="custom", data={"key": "value", "count": 42}
-        )
+        event = Event(execution_id="test", event_type="custom", data={"key": "value", "count": 42})
 
         assert event.data["key"] == "value"
         assert event.data["count"] == 42

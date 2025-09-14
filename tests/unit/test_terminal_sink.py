@@ -49,9 +49,7 @@ class TestTerminalSink:
             Event(execution_id="test", event_type="start", operation="test_op"),
             Event(execution_id="test", event_type="end", operation="test_op"),
             Event(execution_id="test", event_type="token", data={"content": "Hello"}),
-            Event(
-                execution_id="test", event_type="error", data={"error_message": "Test error"}
-            ),
+            Event(execution_id="test", event_type="error", data={"error_message": "Test error"}),
         ]
 
         for event in events:

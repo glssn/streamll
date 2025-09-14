@@ -4,17 +4,15 @@ version = "0.1.0"
 description = "Stream your DSPy application's inner-workings back to users in real-time"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = [
-    "pydantic>=2.0",
-    "nanoid>=2.0",
-]
-authors = [
-    {name = "Nick", email = "nick@glssn.co.uk"}
-]
+dependencies = ["pydantic>=2.0", "nanoid>=2.0", "dspy>=2.7.0"]
+authors = [{ name = "Nick Glasson" }]
 classifiers = [
-    "Development Status :: 3 - Alpha",
-    "License :: OSI Approved :: Apache Software License",
-    "Programming Language :: Python :: 3.11+",
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
 ]
 keywords = ["dspy", "streaming", "llm", "observability", "ai"]
 
@@ -24,38 +22,19 @@ Repository = "https://github.com/glssn/streamll"
 Issues = "https://github.com/glssn/streamll/issues"
 
 [project.optional-dependencies]
-# Production sinks
-redis = [
-    "dspy>=2.7.0,<4.0.0",
-    "faststream[redis]>=0.5.0",
-    "pydantic>=2.0",
-    "nanoid>=2.0",
-]
-rabbitmq = [
-    "dspy>=2.7.0,<4.0.0", 
-    "faststream[rabbit]>=0.5.0",
-    "pydantic>=2.0",
-    "nanoid>=2.0",
-]
-# Terminal sink is built-in, only needs DSPy
-basic = [
-    "dspy>=2.7.0,<4.0.0",
-]
+redis = ["faststream[redis]>=0.5.0"]
+rabbitmq = ["faststream[rabbit]>=0.5.0"]
+all = ["streamll[redis,rabbitmq]"]
 
-# Everything
-all = ["streamll[basic,redis,rabbitmq]"]
-
-# Development dependencies
+[dependency-groups]
 dev = [
-    "streamll[all]",
-    "pytest>=7.4",
-    "pytest-asyncio>=0.21",
-    "pytest-cov>=4.1",
-    "pytest-timeout>=2.1",
-    "pytest-mock>=3.11",
-    "hypothesis>=6.88",
-    "fakeredis>=2.20",
-    "ruff>=0.1",
+  "streamll[all]",
+  "pytest>=7.4",
+  "pytest-asyncio>=0.21",
+  "pytest-cov>=4.1",
+  "pytest-timeout>=2.1",
+  "pytest-mock>=3.11",
+  "ruff>=0.1",
 ]
 
 [tool.pytest.ini_options]
@@ -70,13 +49,8 @@ addopts = """
     --cov-report=term-missing
     --cov-report=html
 """
-# TODO: Enable when implementation starts
-# --cov-fail-under=80
 markers = [
-    "unit: marks tests as unit tests (fast, no external dependencies)",
-    "integration: marks tests as integration tests (require real infrastructure)",
-    "redis: marks tests that require Redis",
-    "rabbitmq: marks tests that require RabbitMQ",
+  "integration: marks tests as integration tests (require real infrastructure)",
 ]
 
 
@@ -84,8 +58,4 @@ markers = [
 line-length = 100
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101"]  # Allow assert in tests
-
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
+"tests/*" = ["S101"] # Allow assert in tests

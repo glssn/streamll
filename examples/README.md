@@ -10,48 +10,39 @@ Make sure you have [uv installed](https://docs.astral.sh/uv/getting-started/inst
 # Set your API key
 export OPENROUTER_API_KEY="your-key"
 # or
-export GEMINI_API_KEY="your-key"  
+export GEMINI_API_KEY="your-key"
 
 # Run examples directly
-./examples/quickstart.py
-./examples/production_redis.py
-./examples/consumer_demo.py
+uv run examples/quickstart.py
+uv run examples/production_redis.py
+uv run examples/consumer_demo.py
 ```
 
-uv will automatically:
+`uv` will automatically:
 - Install Python 3.11+ if needed
-- Create a virtual environment 
+- Create a virtual environment
 - Install dependencies (streamll, dspy, etc.)
 - Run the script
 
 ## Examples
 
 ### `quickstart.py`
+
 Basic streamll usage showing:
 - `@streamll.instrument` decorator
 - Token streaming with `stream_fields=["answer"]`
 - Terminal output (default)
 
 ### `production_redis.py`
+
 Production Redis integration:
 - Stream events to Redis
 - Configure Redis connection
 - Multiple event processing
 
 ### `consumer_demo.py`
+
 Event consumption:
 - Listen for streamll events from Redis
 - Handle different event types (start, token, end, error)
 - Real-time event processing
-
-## Development
-
-When developing streamll, run examples with the local version:
-
-```bash
-# Install in development mode
-uv pip install -e .
-
-# Run examples normally - they'll use your local changes
-./examples/quickstart.py
-```

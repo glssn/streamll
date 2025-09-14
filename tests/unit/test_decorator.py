@@ -7,7 +7,6 @@ from tests.test_helpers import EventCapturingSink
 
 class TestInstrumentDecorator:
     def test_decorator_on_class(self):
-
         @streamll.instrument
         class InstrumentedModule(dspy.Module):
             def __init__(self):

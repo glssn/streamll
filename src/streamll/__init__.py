@@ -18,18 +18,21 @@ __all__ = [
 
 try:
     from streamll.sinks import RedisSink
+
     __all__ += ["RedisSink"]
 except ImportError:
     pass
 
 try:
     from streamll.sinks import RabbitMQSink
+
     __all__ += ["RabbitMQSink"]
 except ImportError:
     pass
 
 try:
     from streamll.event_consumer import EventConsumer
+
     __all__ += ["EventConsumer"]
 except ImportError:
     pass

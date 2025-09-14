@@ -64,9 +64,7 @@ class StreamllDSPyCallback(BaseCallback):
                 else:
                     data["outputs"] = str(outputs)
 
-            event = Event(
-                execution_id=call_id, event_type="end", operation="forward", data=data
-            )
+            event = Event(execution_id=call_id, event_type="end", operation="forward", data=data)
 
         emit_event(event, module_instance=self._module_instance)
 
@@ -92,9 +90,7 @@ class StreamllDSPyCallback(BaseCallback):
         if self.include_outputs and outputs:
             data["response"] = str(outputs)
 
-        event = Event(
-            execution_id=call_id, event_type="llm_end", operation="generate", data=data
-        )
+        event = Event(execution_id=call_id, event_type="llm_end", operation="generate", data=data)
         emit_event(event, module_instance=self._module_instance)
 
     def on_lm_stream(self, call_id: str, token: str, token_index: int) -> None:

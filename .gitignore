@@ -62,3 +62,6 @@ dump.rdb
 uv.lock
 poetry.lock
 Pipfile.lock
+
+# AI
+CLAUDE.md

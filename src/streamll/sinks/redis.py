@@ -38,4 +38,3 @@ class RedisSink:
 
         event_dict = event.model_dump()
         await self.broker.publish(event_dict, stream=self.stream_key)
-

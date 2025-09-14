@@ -27,6 +27,7 @@ class EventConsumer:
     def broker(self):
         if self._broker is None:
             from urllib.parse import urlparse
+
             scheme = urlparse(self.broker_url).scheme.lower()
 
             if scheme == "redis":
@@ -67,6 +68,7 @@ class EventConsumer:
 
     def _register_dispatcher(self) -> None:
         from urllib.parse import urlparse
+
         scheme = urlparse(self.broker_url).scheme.lower()
 
         if scheme == "redis":
@@ -82,7 +84,6 @@ class EventConsumer:
             async def dispatcher(raw_event: dict) -> None:
                 await self._dispatch_event(raw_event)
 
-
     async def _dispatch_event(self, raw_event: dict) -> None:
         event_type = raw_event.get("event_type")
         if event_type and event_type in self._handlers:
@@ -97,6 +98,7 @@ class EventConsumer:
 
     def subscriber(self, **kwargs: Any) -> Callable:
         from urllib.parse import urlparse
+
         scheme = urlparse(self.broker_url).scheme.lower()
         if not any(k in kwargs for k in ["stream", "queue", "subject"]):
             if scheme == "redis":
@@ -116,4 +118,3 @@ class EventConsumer:
 
     async def run(self) -> None:
         await self.app.run()
-

@@ -45,7 +45,9 @@ def _emit_to_sinks(event: Event, sinks: list[Any]) -> None:
             try:
                 result = sink.handle_event(event)
                 if inspect.iscoroutine(result):
-                    logger.warning(f"Async sink {type(sink).__name__} called from sync context - skipping")
+                    logger.warning(
+                        f"Async sink {type(sink).__name__} called from sync context - skipping"
+                    )
             except Exception as e:
                 logger.warning(f"Sink {type(sink).__name__} failed: {e}")
 
