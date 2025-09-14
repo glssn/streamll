@@ -9,7 +9,7 @@
 import asyncio
 import os
 from streamll.event_consumer import EventConsumer
-from streamll.models import StreamllEvent
+from streamll.models import Event
 
 
 async def main():
@@ -24,21 +24,21 @@ async def main():
     consumer = EventConsumer(broker_url=redis_url, target=stream_key)
 
     @consumer.on("start")
-    async def handle_start(event: StreamllEvent):
+    async def handle_start(event: Event):
         print(f"🟢 START: {event.operation} (ID: {event.execution_id})")
 
     @consumer.on("token")
-    async def handle_token(event: StreamllEvent):
+    async def handle_token(event: Event):
         token = event.data.get("token", "")
         print(token, end="", flush=True)
 
     @consumer.on("end")
-    async def handle_end(event: StreamllEvent):
+    async def handle_end(event: Event):
         duration = event.data.get("duration", 0)
         print(f"\n🔴 END: {event.operation} ({duration:.2f}s)\n")
 
     @consumer.on("error")
-    async def handle_error(event: StreamllEvent):
+    async def handle_error(event: Event):
         error = event.data.get("error_message", "Unknown error")
         print(f"❌ ERROR: {error}\n")
 

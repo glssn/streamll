@@ -1,6 +1,6 @@
 import io
 
-from streamll.models import StreamllEvent
+from streamll.models import Event
 from streamll.sinks.terminal import TerminalSink
 
 
@@ -24,7 +24,7 @@ class TestTerminalSink:
         sink = TerminalSink(output=output)
         sink.start()
 
-        event = StreamllEvent(
+        event = Event(
             execution_id="test_exec",
             event_type="custom",
             operation="test_op",
@@ -46,10 +46,10 @@ class TestTerminalSink:
         sink.start()
 
         events = [
-            StreamllEvent(execution_id="test", event_type="start", operation="test_op"),
-            StreamllEvent(execution_id="test", event_type="end", operation="test_op"),
-            StreamllEvent(execution_id="test", event_type="token", data={"content": "Hello"}),
-            StreamllEvent(
+            Event(execution_id="test", event_type="start", operation="test_op"),
+            Event(execution_id="test", event_type="end", operation="test_op"),
+            Event(execution_id="test", event_type="token", data={"content": "Hello"}),
+            Event(
                 execution_id="test", event_type="error", data={"error_message": "Test error"}
             ),
         ]
@@ -64,7 +64,7 @@ class TestTerminalSink:
         sink.start()
 
         # Add event - no flush needed, outputs immediately
-        event = StreamllEvent(execution_id="test", event_type="custom")
+        event = Event(execution_id="test", event_type="custom")
         sink.handle_event(event)
 
         sink.stop()

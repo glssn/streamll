@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from streamll.models import StreamllEvent
+from streamll.models import Event
 from streamll.sinks.rabbitmq import RabbitMQSink
 from streamll.sinks.redis import RedisSink
 from streamll.sinks.terminal import TerminalSink
@@ -13,7 +13,7 @@ class TestTerminalSink:
         sink = TerminalSink()
         sink.start()
 
-        event = StreamllEvent(execution_id="test", event_type="test", data={"message": "test"})
+        event = Event(execution_id="test", event_type="test", data={"message": "test"})
         sink.handle_event(event)
 
         captured = capsys.readouterr()
@@ -41,7 +41,7 @@ class TestRedisSink:
             sink = RedisSink(redis_url="redis://localhost:6379", stream_key="test")
             await sink.start()
 
-            event = StreamllEvent(execution_id="test", event_type="test")
+            event = Event(execution_id="test", event_type="test")
             await sink.handle_event(event)
 
             mock_broker.publish.assert_called_once()
@@ -69,7 +69,7 @@ class TestRabbitMQSink:
             sink = RabbitMQSink(rabbitmq_url="amqp://localhost:5672", queue="test")
             await sink.start()
 
-            event = StreamllEvent(execution_id="test", event_type="error", data={"error": "test"})
+            event = Event(execution_id="test", event_type="error", data={"error": "test"})
             await sink.handle_event(event)
 
             mock_broker.publish.assert_called_once_with(event, queue="test")

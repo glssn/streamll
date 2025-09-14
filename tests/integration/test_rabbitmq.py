@@ -2,7 +2,7 @@ import pytest
 from nanoid import generate
 
 from streamll.event_consumer import EventConsumer
-from streamll.models import StreamllEvent
+from streamll.models import Event
 from streamll.sinks.rabbitmq import RabbitMQSink
 
 
@@ -36,7 +36,7 @@ class TestRabbitMQIntegration:
         received_event = None
 
         @consumer.on("error")
-        async def handle_error(event: StreamllEvent):
+        async def handle_error(event: Event):
             nonlocal received_event
             received_event = event
 
@@ -49,7 +49,7 @@ class TestRabbitMQIntegration:
         sink = RabbitMQSink(rabbitmq_url="amqp://guest:guest@localhost:5672/", queue=queue)
         await sink.start()
 
-        event = StreamllEvent(
+        event = Event(
             execution_id="test",
             event_type="error",
             data={"error": "test_error", "code": 500},

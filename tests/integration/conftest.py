@@ -2,12 +2,12 @@ import time
 
 import pytest
 
-from streamll.models import StreamllEvent
+from streamll.models import Event
 
 
 @pytest.fixture
 def sample_integration_event():
-    return StreamllEvent(
+    return Event(
         execution_id="integration-test-001",
         event_type="test",
         operation="integration_test",

@@ -4,7 +4,7 @@ from typing import Any
 from dspy.utils.callback import BaseCallback
 
 from streamll.context import emit_event, get_conversation_context
-from streamll.models import StreamllEvent
+from streamll.models import Event
 
 
 class StreamllDSPyCallback(BaseCallback):
@@ -21,7 +21,7 @@ class StreamllDSPyCallback(BaseCallback):
         if self.include_inputs:
             data.update(inputs)
 
-        event = StreamllEvent(
+        event = Event(
             execution_id=call_id,
             event_type="start",
             operation="forward",
@@ -47,7 +47,7 @@ class StreamllDSPyCallback(BaseCallback):
                     "duration": duration,
                 }
             )
-            event = StreamllEvent(
+            event = Event(
                 execution_id=call_id,
                 event_type="error",
                 operation="forward",
@@ -64,7 +64,7 @@ class StreamllDSPyCallback(BaseCallback):
                 else:
                     data["outputs"] = str(outputs)
 
-            event = StreamllEvent(
+            event = Event(
                 execution_id=call_id, event_type="end", operation="forward", data=data
             )
 
@@ -74,7 +74,7 @@ class StreamllDSPyCallback(BaseCallback):
         data = get_conversation_context()
         if self.include_inputs:
             data.update(inputs)
-        event = StreamllEvent(
+        event = Event(
             execution_id=call_id,
             event_type="llm_start",
             operation="generate",
@@ -92,7 +92,7 @@ class StreamllDSPyCallback(BaseCallback):
         if self.include_outputs and outputs:
             data["response"] = str(outputs)
 
-        event = StreamllEvent(
+        event = Event(
             execution_id=call_id, event_type="llm_end", operation="generate", data=data
         )
         emit_event(event, module_instance=self._module_instance)
@@ -100,7 +100,7 @@ class StreamllDSPyCallback(BaseCallback):
     def on_lm_stream(self, call_id: str, token: str, token_index: int) -> None:
         data = get_conversation_context()
         data.update({"token": token, "index": token_index})
-        event = StreamllEvent(
+        event = Event(
             execution_id=call_id,
             event_type="token",
             operation="stream",

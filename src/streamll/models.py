@@ -9,7 +9,7 @@ def generate_event_id() -> str:
     return generate(size=12)
 
 
-class StreamllEvent(BaseModel):
+class Event(BaseModel):
     event_id: str = Field(default_factory=lambda: generate(size=12))
     execution_id: str
     timestamp: AwareDatetime = Field(default_factory=lambda: datetime.now(UTC))

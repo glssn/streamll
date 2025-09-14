@@ -2,7 +2,7 @@ from typing import Any
 
 from faststream.redis import RedisBroker
 
-from streamll.models import StreamllEvent
+from streamll.models import Event
 
 
 class RedisSink:
@@ -29,7 +29,7 @@ class RedisSink:
             await self.broker.stop()
             self._connected = False
 
-    async def handle_event(self, event: StreamllEvent) -> None:
+    async def handle_event(self, event: Event) -> None:
         if not self.is_running:
             return
 

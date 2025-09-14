@@ -4,7 +4,7 @@ import socket
 
 import pytest
 
-from streamll.models import StreamllEvent
+from streamll.models import Event
 
 
 @pytest.fixture(scope="session")
@@ -16,7 +16,7 @@ def event_loop():
 
 @pytest.fixture
 def sample_event():
-    return StreamllEvent(
+    return Event(
         execution_id="test_exec_123",
         event_type="start",
         operation="test_operation",
@@ -28,19 +28,19 @@ def sample_event():
 @pytest.fixture
 def sample_events():
     return [
-        StreamllEvent(
+        Event(
             execution_id="exec_1",
             event_type="start",
             operation="operation_1",
             data={"input": "test1"},
         ),
-        StreamllEvent(
+        Event(
             execution_id="exec_1",
             event_type="end",
             operation="operation_1",
             data={"output": "result1"},
         ),
-        StreamllEvent(
+        Event(
             execution_id="exec_2",
             event_type="error",
             operation="operation_2",

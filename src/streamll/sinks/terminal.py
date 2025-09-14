@@ -2,7 +2,7 @@ import sys
 from io import TextIOWrapper
 from typing import TextIO
 
-from streamll.models import StreamllEvent
+from streamll.models import Event
 
 
 class TerminalSink:
@@ -18,7 +18,7 @@ class TerminalSink:
     def stop(self) -> None:
         self.is_running = False
 
-    def handle_event(self, event: StreamllEvent) -> None:
+    def handle_event(self, event: Event) -> None:
         if event.event_type == "token" and not self.show_tokens:
             return
 

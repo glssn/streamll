@@ -146,19 +146,7 @@ def create_streaming_wrapper(  # noqa: C901
 
 
 def _extract_provider_from_chunk(chunk: Any) -> str:
-    if hasattr(chunk, "model") and chunk.model:
-        model = chunk.model.lower()
-        if "gpt" in model or "openai" in model:
-            return "openai"
-        elif "gemini" in model or "google" in model:
-            return "gemini"
-        elif "claude" in model or "anthropic" in model:
-            return "anthropic"
-        elif "llama" in model:
-            return "meta"
-        else:
-            return model
-    return "unknown"
+    return getattr(chunk, "model", "unknown") or "unknown"
 
 
 def _find_predictors_in_module(
@@ -191,7 +179,7 @@ def _find_predictors_in_module(
 
 def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str]) -> Callable:  # noqa: C901
     from streamll.context import emit_event, get_execution_id
-    from streamll.models import StreamllEvent, generate_event_id
+    from streamll.models import Event, generate_event_id
 
     try:
         import dspy
@@ -232,7 +220,7 @@ def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str
                         if isinstance(chunk, StreamResponse):
                             field_name = chunk.signature_field_name
                             if field_name in indices:
-                                event = StreamllEvent(
+                                event = Event(
                                     event_id=generate_event_id(),
                                     execution_id=get_execution_id(),
                                     timestamp=datetime.now(UTC),

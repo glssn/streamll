@@ -1,4 +1,4 @@
-from streamll.models import StreamllEvent
+from streamll.models import Event
 
 
 class EventCapturingSink:
@@ -12,7 +12,7 @@ class EventCapturingSink:
     def stop(self) -> None:
         self.is_running = False
 
-    def handle_event(self, event: StreamllEvent) -> None:
+    def handle_event(self, event: Event) -> None:
         self.events.append(event)
 
     def clear(self) -> None:

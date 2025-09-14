@@ -7,7 +7,7 @@ from typing import Any
 
 from nanoid import generate
 
-from streamll.models import StreamllEvent, generate_event_id
+from streamll.models import Event, generate_event_id
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ def _validate_and_start_sinks(sinks: list[Any]) -> None:
                         asyncio.run(result)
 
 
-def _emit_to_sinks(event: StreamllEvent, sinks: list[Any]) -> None:
+def _emit_to_sinks(event: Event, sinks: list[Any]) -> None:
     import asyncio
     import inspect
 
@@ -46,22 +46,7 @@ def _emit_to_sinks(event: StreamllEvent, sinks: list[Any]) -> None:
             try:
                 result = sink.handle_event(event)
                 if inspect.iscoroutine(result):
-                    try:
-                        try:
-                            asyncio.get_running_loop()
-                            import concurrent.futures
-
-                            def run_in_thread():
-                                return asyncio.run(result)
-
-                            with concurrent.futures.ThreadPoolExecutor() as executor:
-                                future = executor.submit(run_in_thread)
-                                future.result(timeout=5.0)
-
-                        except RuntimeError:
-                            asyncio.run(result)
-                    except Exception as e:
-                        logger.warning(f"Async sink {type(sink).__name__} failed: {e}")
+                    logger.warning(f"Async sink {type(sink).__name__} called from sync context - skipping")
             except Exception as e:
                 logger.warning(f"Sink {type(sink).__name__} failed: {e}")
 
@@ -158,7 +143,7 @@ def emit(
     data: dict[str, Any] | None = None,
     **kwargs,
 ) -> None:
-    event = StreamllEvent(
+    event = Event(
         execution_id=get_execution_id(),
         event_type=event_type,
         operation=operation,
@@ -168,7 +153,7 @@ def emit(
     emit_event(event, module_instance=None)
 
 
-def emit_event(event: StreamllEvent, module_instance: Any | None = None) -> None:
+def emit_event(event: Event, module_instance: Any | None = None) -> None:
     if _global_event_filter and event.event_type not in _global_event_filter:
         return
 
@@ -213,7 +198,7 @@ class StreamllContext:
             if hasattr(sink, "is_running") and not sink.is_running:
                 sink.start()
 
-        start_event = StreamllEvent(
+        start_event = Event(
             event_id=generate_event_id(),
             execution_id=self.execution_id,
             timestamp=datetime.now(UTC),
@@ -247,7 +232,7 @@ class StreamllContext:
                 }
             )
 
-        event = StreamllEvent(
+        event = Event(
             event_id=generate_event_id(),
             execution_id=self.execution_id,
             timestamp=datetime.now(UTC),

@@ -2,7 +2,7 @@ import pytest
 from nanoid import generate
 
 from streamll.event_consumer import EventConsumer
-from streamll.models import StreamllEvent
+from streamll.models import Event
 from streamll.sinks.redis import RedisSink
 
 
@@ -36,7 +36,7 @@ class TestRedisIntegration:
         received_events = []
 
         @consumer.on("token")
-        async def handle_token(event: StreamllEvent):
+        async def handle_token(event: Event):
             received_events.append(event)
 
         import asyncio
@@ -49,7 +49,7 @@ class TestRedisIntegration:
         await sink.start()
 
         for i in range(3):
-            event = StreamllEvent(
+            event = Event(
                 execution_id="test",
                 event_type="token",
                 data={"token": f"word_{i}", "index": i},

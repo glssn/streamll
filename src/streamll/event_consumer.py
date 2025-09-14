@@ -3,7 +3,7 @@ from typing import Any, Callable
 
 from faststream import FastStream
 
-from streamll.models import StreamllEvent
+from streamll.models import Event
 
 
 class EventConsumer:
@@ -37,18 +37,10 @@ class EventConsumer:
                 from faststream.rabbit import RabbitBroker
 
                 self._broker = RabbitBroker(self.broker_url, **self.broker_kwargs)
-            elif scheme == "nats":
-                from faststream.nats import NatsBroker
-
-                self._broker = NatsBroker(self.broker_url, **self.broker_kwargs)
-            elif scheme == "kafka":
-                from faststream.kafka import KafkaBroker
-
-                self._broker = KafkaBroker(self.broker_url, **self.broker_kwargs)
             else:
                 raise ValueError(
                     f"Unsupported broker URL scheme: {scheme}. "
-                    f"Supported: redis://, amqp://, rabbitmq://, nats://, kafka://"
+                    f"Supported: redis://, amqp://, rabbitmq://"
                 )
 
         return self._broker
@@ -60,7 +52,7 @@ class EventConsumer:
         return self._app
 
     def on(self, event_type: str) -> Callable:
-        def decorator(func: Callable[[StreamllEvent], Any]) -> Callable:
+        def decorator(func: Callable[[Event], Any]) -> Callable:
             if event_type not in self._handlers:
                 self._handlers[event_type] = []
             self._handlers[event_type].append(func)
@@ -90,20 +82,15 @@ class EventConsumer:
             async def dispatcher(raw_event: dict) -> None:
                 await self._dispatch_event(raw_event)
 
-        else:
-
-            @self.broker.subscriber(self.target)
-            async def dispatcher(raw_event: dict) -> None:
-                await self._dispatch_event(raw_event)
 
     async def _dispatch_event(self, raw_event: dict) -> None:
         event_type = raw_event.get("event_type")
         if event_type and event_type in self._handlers:
-            event = StreamllEvent(**raw_event)  # type: ignore[missing-argument]
+            event = Event(**raw_event)  # type: ignore[missing-argument]
             for handler in self._handlers[event_type]:
                 await handler(event)
 
-    async def _dispatch_event_direct(self, event: StreamllEvent) -> None:
+    async def _dispatch_event_direct(self, event: Event) -> None:
         if event.event_type and event.event_type in self._handlers:
             for handler in self._handlers[event.event_type]:
                 await handler(event)

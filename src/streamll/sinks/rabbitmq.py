@@ -2,7 +2,7 @@ from typing import Any
 
 from faststream.rabbit import RabbitBroker
 
-from streamll.models import StreamllEvent
+from streamll.models import Event
 
 
 class RabbitMQSink:
@@ -31,7 +31,7 @@ class RabbitMQSink:
             await self.broker.stop()
             self._connected = False
 
-    async def handle_event(self, event: StreamllEvent) -> None:
+    async def handle_event(self, event: Event) -> None:
         if not self.is_running:
             return
 
