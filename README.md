@@ -1,8 +1,6 @@
 # streamll
 
-Production-ready streaming for DSPy applications.
-
-Stream every step of your AI application - like retrieval, reasoning and token generation - directly into Redis, RabbitMQ, and your existing event infrastructure.
+Stream your DSPy application's inner-workings back to users in real-time. Route reasoning steps, token generation, and progress updates directly through your existing infrastructure.
 
 ## Installation
 
