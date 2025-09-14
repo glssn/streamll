@@ -20,7 +20,7 @@ class TestExamples:
     def test_quickstart_runs(self, examples_dir, mock_env):
         script = examples_dir / "quickstart.py"
         result = subprocess.run(
-            [str(script)], env=mock_env, capture_output=True, text=True, timeout=15
+            ["uv", "run", str(script)], env=mock_env, capture_output=True, text=True, timeout=15
         )
 
         # Should not crash (exit code 0 or expected API error)

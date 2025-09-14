@@ -95,7 +95,7 @@ def create_streaming_wrapper(  # noqa: C901
                         stream_iterator = apply_sync_streaming(stream_iterator)  # type: ignore[arg-type]
                         streaming_mode = "real_dspy_async"
                 except ImportError:
-                    logger.warning("DSPy async streaming conversion not available")
+                    pass
 
             for chunk in stream_iterator:  # type: ignore[union-attr]
                 _, final_result, token_index = _process_stream_chunk(
@@ -115,14 +115,13 @@ def create_streaming_wrapper(  # noqa: C901
                 )
                 try:
                     final_result = module(*args, **kwargs)
-                except Exception as e:
-                    logger.warning(f"Failed to get final result after streaming: {e}")
+                except Exception:
+                    final_result = None
 
             return final_result
 
         except Exception as e:
             logger.warning("Streaming failed: %s", e)
-            logger.info("Falling back to non-streaming execution")
 
             result = module(*args, **kwargs)
             if hasattr(result, signature_field_name):
@@ -171,8 +170,8 @@ def _find_predictors_in_module(
             output_fields = predictor.signature.output_fields
             if any(f in output_fields for f in stream_fields):
                 result.append((predictor_name, predictor, parent))
-        except (AttributeError, Exception) as e:
-            logger.warning(f"Could not check predictor {predictor_name}: {e}")
+        except (AttributeError, Exception):
+            continue
 
     return result
 
@@ -185,8 +184,7 @@ def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str
         import dspy
         from dspy.streaming import StreamListener, streamify
         from dspy.streaming.messages import StreamResponse
-    except ImportError as e:
-        logger.warning(f"DSPy streaming not available: {e}")
+    except ImportError:
         return forward_method
 
     def streaming_forward(*args, **kwargs):  # noqa: C901
