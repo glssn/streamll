@@ -38,7 +38,6 @@ def _validate_and_start_sinks(sinks: list[Any]) -> None:
 
 
 def _emit_to_sinks(event: Event, sinks: list[Any]) -> None:
-    import asyncio
     import inspect
 
     for sink in sinks:
