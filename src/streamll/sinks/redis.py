@@ -1,6 +1,7 @@
+import json
 from typing import Any
 
-from faststream.redis import RedisBroker
+import redis
 
 from streamll.models import Event
 
@@ -10,31 +11,45 @@ class RedisSink:
         self,
         redis_url: str = "redis://localhost:6379",
         stream_key: str = "streamll_events",
-        **broker_kwargs: Any,
+        max_stream_length: int = 10000,
+        **connection_kwargs: Any,
     ):
-        self.broker = RedisBroker(redis_url, **broker_kwargs)
+        self.redis_url = redis_url
         self.stream_key = stream_key
+        self.max_stream_length = max_stream_length
+        self.connection_kwargs = connection_kwargs
         self.is_running = False
-        self._connected = False
+        self._connection_pool = None
+        self._redis = None
 
-    async def start(self) -> None:
-        if not self._connected:
-            await self.broker.connect()
-            self._connected = True
+    def start(self) -> None:
+        if not self._connection_pool:
+            self._connection_pool = redis.ConnectionPool.from_url(
+                self.redis_url, **self.connection_kwargs
+            )
+            self._redis = redis.Redis(connection_pool=self._connection_pool)
         self.is_running = True
 
-    async def stop(self) -> None:
+    def stop(self) -> None:
         self.is_running = False
-        if self._connected:
-            await self.broker.stop()
-            self._connected = False
+        if self._connection_pool:
+            self._connection_pool.disconnect()
+            self._connection_pool = None
+            self._redis = None
 
-    async def handle_event(self, event: Event) -> None:
+    def handle_event(self, event: Event) -> None:
         if not self.is_running:
             return
 
-        if not self._connected:
-            await self.start()
+        if not self._redis:
+            self.start()
 
         event_dict = event.model_dump()
-        await self.broker.publish(event_dict, stream=self.stream_key)
+        message_json = json.dumps(event_dict, default=str)
+
+        self._redis.xadd(
+            name=self.stream_key,
+            fields={"message": message_json},
+            maxlen=self.max_stream_length,
+            approximate=True,
+        )

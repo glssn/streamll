@@ -22,7 +22,7 @@ class StreamllDSPyCallback(BaseCallback):
             data.update(inputs)
 
         event = Event(
-            execution_id=call_id,
+            execution_id="",
             event_type="start",
             operation="forward",
             data=data,
@@ -48,7 +48,7 @@ class StreamllDSPyCallback(BaseCallback):
                 }
             )
             event = Event(
-                execution_id=call_id,
+                execution_id="",
                 event_type="error",
                 operation="forward",
                 data=data,
@@ -64,7 +64,7 @@ class StreamllDSPyCallback(BaseCallback):
                 else:
                     data["outputs"] = str(outputs)
 
-            event = Event(execution_id=call_id, event_type="end", operation="forward", data=data)
+            event = Event(execution_id="", event_type="end", operation="forward", data=data)
 
         emit_event(event, module_instance=self._module_instance)
 

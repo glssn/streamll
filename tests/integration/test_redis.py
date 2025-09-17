@@ -1,7 +1,7 @@
 import pytest
 from nanoid import generate
 
-from streamll.event_consumer import EventConsumer
+from streamll import RedisEventConsumer
 from streamll.models import Event
 from streamll.sinks.redis import RedisSink
 
@@ -32,7 +32,7 @@ class TestRedisIntegration:
         stream_key = f"test_stream_{generate(size=8)}"
 
         # Consumer setup
-        consumer = EventConsumer(broker_url="redis://localhost:6379", target=stream_key)
+        consumer = RedisEventConsumer(broker_url="redis://localhost:6379", target=stream_key)
         received_events = []
 
         @consumer.on("token")
@@ -41,12 +41,12 @@ class TestRedisIntegration:
 
         import asyncio
 
-        consumer_task = asyncio.create_task(consumer.app.run())
+        consumer_task = asyncio.create_task(consumer.run())
         await asyncio.sleep(0.5)  # Let consumer start
 
         # Publish events
         sink = RedisSink(redis_url="redis://localhost:6379", stream_key=stream_key)
-        await sink.start()
+        sink.start()
 
         for i in range(3):
             event = Event(
@@ -54,12 +54,16 @@ class TestRedisIntegration:
                 event_type="token",
                 data={"token": f"word_{i}", "index": i},
             )
-            await sink.handle_event(event)
+            sink.handle_event(event)
+
+        sink.stop()
 
         await asyncio.sleep(1)  # Let events process
+        await consumer.stop()
         consumer_task.cancel()
+
         try:
-            await consumer_task
+            await asyncio.wait_for(consumer_task, timeout=2.0)
         except asyncio.CancelledError:
             pass
 

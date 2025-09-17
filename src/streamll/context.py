@@ -19,22 +19,18 @@ _global_event_filter: set[str] | None = None
 
 
 def _validate_and_start_sinks(sinks: list[Any]) -> None:
+    import inspect
+
     for sink in sinks:
         if not hasattr(sink, "handle_event"):
             raise TypeError(f"Sink {sink} must have handle_event method")
         if hasattr(sink, "is_running") and not sink.is_running:
             if hasattr(sink, "start"):
                 result = sink.start()
-                if hasattr(result, "__await__"):
-                    import asyncio
-
-                    try:
-                        asyncio.get_running_loop()
-                        logger.warning(
-                            f"Cannot start async sink {type(sink).__name__} from sync context"
-                        )
-                    except RuntimeError:
-                        asyncio.run(result)
+                if inspect.iscoroutine(result):
+                    logger.warning(
+                        f"Async sink {type(sink).__name__} cannot be started from sync context - skipping"
+                    )
 
 
 def _emit_to_sinks(event: Event, sinks: list[Any]) -> None:
@@ -87,7 +83,14 @@ class ConfigurationContext:
 
         for sink in _shared_sinks:
             if not sink.is_running:
-                sink.start()
+                result = sink.start()
+                if hasattr(result, "__await__"):
+                    import inspect
+
+                    if inspect.iscoroutine(result):
+                        logger.warning(
+                            f"Async sink {type(sink).__name__} cannot be started from sync context - skipping"
+                        )
 
 
 def configure(
@@ -158,6 +161,14 @@ def emit_event(event: Event, module_instance: Any | None = None) -> None:
     if _global_event_filter and event.event_type not in _global_event_filter:
         return
 
+    context = _execution_context.get({})
+    if context:
+        if (not event.execution_id or event.execution_id == "") and "execution_id" in context:
+            event.execution_id = context["execution_id"]
+
+        if "metadata" in context:
+            event.data.update(context["metadata"])
+
     all_sinks = []
     if module_instance:
         all_sinks.extend(_module_sinks.get(id(module_instance), []))
@@ -183,7 +194,7 @@ class StreamllContext:
         self.parent_context = None
 
     def __enter__(self) -> "StreamllContext":
-        self.execution_id = generate_event_id()
+        self.execution_id = self.metadata.pop("execution_id", generate_event_id())
         self.start_time = time.time()
 
         self.parent_context = _execution_context.get(None)
@@ -197,7 +208,14 @@ class StreamllContext:
 
         for sink in self.local_sinks:
             if hasattr(sink, "is_running") and not sink.is_running:
-                sink.start()
+                result = sink.start()
+                if hasattr(result, "__await__"):
+                    import inspect
+
+                    if inspect.iscoroutine(result):
+                        logger.warning(
+                            f"Async sink {type(sink).__name__} cannot be started from sync context - skipping"
+                        )
 
         start_event = Event(
             event_id=generate_event_id(),

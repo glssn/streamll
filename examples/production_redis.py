@@ -4,20 +4,38 @@
 #     "streamll[redis]",
 #     "dspy>=2.7.0",
 # ]
+#
+# [tool.uv.sources]
+# streamll = { path = "../", editable = true }
 # ///
 
 import os
+import socket
 import dspy
 import streamll
 from streamll.sinks import RedisSink  # type: ignore[possibly-unbound-import]
 
-# Configure LLM
-if os.getenv("OPENROUTER_API_KEY"):
-    lm = dspy.LM("openrouter/qwen/qwen-2.5-72b-instruct", cache=False)
-elif os.getenv("GEMINI_API_KEY"):
-    lm = dspy.LM("gemini/gemini-2.0-flash-exp", cache=False)
-else:
-    raise ValueError("Set OPENROUTER_API_KEY or GEMINI_API_KEY")
+
+def service_available(host: str = "localhost", port: int = 1234) -> bool:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(1)
+    try:
+        result = sock.connect_ex((host, port))
+        return result == 0
+    finally:
+        sock.close()
+
+
+if not service_available("localhost", 1234):
+    raise ValueError("Start local LLM on localhost:1234")
+
+lm = dspy.LM(
+    model="openai/deepseek-r1-distill-qwen-7b",
+    api_key="test",
+    api_base="http://localhost:1234/v1",
+    max_tokens=400,
+    cache=False,
+)
 
 dspy.settings.configure(lm=lm)
 
@@ -33,30 +51,15 @@ class AssistantModule(dspy.Module):
 
 
 if __name__ == "__main__":
-    # Redis configuration
     redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
     stream_key = "streamll:events"
-
-    print(f"🔄 Streaming to Redis: {redis_url}")
-    print(f"📝 Stream key: {stream_key}\n")
-
-    # Configure Redis sink
     redis_sink = RedisSink(redis_url=redis_url, stream_key=stream_key)
-
     assistant = AssistantModule()
 
     with streamll.configure(sinks=[redis_sink]):
-        # Process multiple queries
-        queries = [
-            "Explain quantum computing",
-            "What's the future of AI?",
-            "How do neural networks work?",
-        ]
+        queries = ["Briefly explain quantum computing", "What's the future of AI, as a haiku?"]
 
-        for i, query in enumerate(queries, 1):
-            print(f"Query {i}: {query}")
+        for query in queries:
             result = assistant(query=query)
-            print("✅ Streamed to Redis\n")
 
-    print("🏁 All events sent to Redis!")
-    print(f"💡 View events with: redis-cli XREAD COUNT 10 STREAMS {stream_key} 0")
+    print(f"View events with: redis-cli XREAD COUNT 10 STREAMS {stream_key} 0")

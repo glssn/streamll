@@ -4,19 +4,37 @@
 #     "streamll",
 #     "dspy>=2.7.0",
 # ]
+#
+# [tool.uv.sources]
+# streamll = { path = "../", editable = true }
 # ///
 
 import os
+import socket
 import dspy
 import streamll
 
-# Configure LLM
-if os.getenv("OPENROUTER_API_KEY"):
-    lm = dspy.LM("openrouter/qwen/qwen-2.5-72b-instruct", cache=False)
-elif os.getenv("GEMINI_API_KEY"):
-    lm = dspy.LM("gemini/gemini-2.0-flash-exp", cache=False)
-else:
-    raise ValueError("Set OPENROUTER_API_KEY or GEMINI_API_KEY")
+
+def service_available(host: str = "localhost", port: int = 1234) -> bool:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(1)
+    try:
+        result = sock.connect_ex((host, port))
+        return result == 0
+    finally:
+        sock.close()
+
+
+if not service_available("localhost", 1234):
+    raise ValueError("Start local LLM on localhost:1234")
+
+lm = dspy.LM(
+    model="openai/deepseek-r1-distill-qwen-7b",
+    api_key="test",
+    api_base="http://localhost:1234/v1",
+    max_tokens=200,
+    cache=False,
+)
 
 dspy.settings.configure(lm=lm)
 
@@ -44,18 +62,12 @@ class StreamingQA(dspy.Module):
 
 
 if __name__ == "__main__":
-    print("🚀 streamll Quickstart\n")
-
-    # Example 1: Basic usage
-    print("1. Basic instrumentation:")
     basic_qa = BasicQA()
-    with streamll.configure():  # Uses TerminalSink by default
+    with streamll.configure():
         result = basic_qa("What is the capital of France?")
-        print(f"Answer: {result.answer}\n")
+        print(f"Answer: {result.answer}")
 
-    # Example 2: Token streaming
-    print("2. Token streaming:")
     streaming_qa = StreamingQA()
     with streamll.configure():
         result = streaming_qa("Write a haiku about programming")
-        print(f"\nFinal answer: {result.answer}")
+        print(f"Final answer: {result.answer}")

@@ -1,7 +1,7 @@
 import pytest
 from nanoid import generate
 
-from streamll.event_consumer import EventConsumer
+from streamll import RabbitMQEventConsumer
 from streamll.models import Event
 from streamll.sinks.rabbitmq import RabbitMQSink
 
@@ -32,7 +32,9 @@ class TestRabbitMQIntegration:
         queue = f"test_queue_{generate(size=8)}"
 
         # Consumer setup
-        consumer = EventConsumer(broker_url="amqp://guest:guest@localhost:5672/", target=queue)
+        consumer = RabbitMQEventConsumer(
+            broker_url="amqp://guest:guest@localhost:5672/", target=queue
+        )
         received_event = None
 
         @consumer.on("error")
@@ -42,24 +44,28 @@ class TestRabbitMQIntegration:
 
         import asyncio
 
-        consumer_task = asyncio.create_task(consumer.app.run())
+        consumer_task = asyncio.create_task(consumer.run())
         await asyncio.sleep(0.5)  # Let consumer start
 
         # Publish event
         sink = RabbitMQSink(rabbitmq_url="amqp://guest:guest@localhost:5672/", queue=queue)
-        await sink.start()
+        sink.start()
 
         event = Event(
             execution_id="test",
             event_type="error",
             data={"error": "test_error", "code": 500},
         )
-        await sink.handle_event(event)
+        sink.handle_event(event)
+        sink.stop()
 
         await asyncio.sleep(1)  # Let event process
+        await consumer.stop()
         consumer_task.cancel()
+
+        # Wait for task with timeout to prevent hanging
         try:
-            await consumer_task
+            await asyncio.wait_for(consumer_task, timeout=2.0)
         except asyncio.CancelledError:
             pass
 

@@ -1,10 +1,17 @@
 [project]
 name = "streamll"
-version = "0.1.1"
+version = "0.2.0-dev"
 description = "Stream your DSPy application's inner-workings back to users in real-time"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["pydantic>=2.0", "nanoid>=2.0", "dspy>=2.7.0"]
+dependencies = [
+    "pydantic>=2.0",
+    "nanoid>=2.0",
+    "dspy>=2.7.0",
+    "aio-pika>=9.0.0",
+    "pika>=1.3.0",
+    "redis>=6.4.0",
+]
 authors = [{ name = "Nick Glasson" }]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -22,13 +29,12 @@ Repository = "https://github.com/glssn/streamll"
 Issues = "https://github.com/glssn/streamll/issues"
 
 [project.optional-dependencies]
-redis = ["faststream[redis]>=0.5.0"]
-rabbitmq = ["faststream[rabbit]>=0.5.0"]
-all = ["streamll[redis,rabbitmq]"]
+redis = [
+    "redis>=6.4.0",
+]
 
 [dependency-groups]
 dev = [
-  "streamll[all]",
   "pytest>=7.4",
   "pytest-asyncio>=0.21",
   "pytest-cov>=4.1",
@@ -51,6 +57,14 @@ addopts = """
 """
 markers = [
   "integration: marks tests as integration tests (require real infrastructure)",
+]
+filterwarnings = [
+  # Ignore litellm's Pydantic deprecation warnings
+  "ignore:Accessing the 'model_fields' attribute:DeprecationWarning:litellm",
+  # Ignore Pydantic serialization warnings for streaming responses
+  "ignore:Pydantic serializer warnings::pydantic",
+  # Ignore httpx content warning
+  "ignore:Use 'content=<...>' to upload:DeprecationWarning:httpx",
 ]
 
 [build-system]

@@ -182,7 +182,7 @@ def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str
 
     try:
         import dspy
-        from dspy.streaming import StreamListener, streamify
+        from dspy.streaming import streamify
         from dspy.streaming.messages import StreamResponse
     except ImportError:
         return forward_method
@@ -200,11 +200,8 @@ def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str
                 field: 0 for field in stream_fields if field in predictor.signature.output_fields
             }
 
-            listeners = [StreamListener(signature_field_name=field) for field in token_indices]
-
             stream_predictor = streamify(
                 predictor,
-                stream_listeners=listeners,
                 async_streaming=False,
                 include_final_prediction_in_output_stream=True,
             )
@@ -213,7 +210,6 @@ def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str
                 def streaming_predict(*pred_args, **pred_kwargs):
                     result = None
                     stream_output = predictor(*pred_args, **pred_kwargs)
-
                     for chunk in stream_output:
                         if isinstance(chunk, StreamResponse):
                             field_name = chunk.signature_field_name
@@ -233,6 +229,26 @@ def wrap_with_streaming(forward_method, module_instance, stream_fields: list[str
                                 )
                                 emit_event(event, module_instance)
                                 indices[field_name] += 1
+                        elif hasattr(chunk, "choices") and chunk.choices:
+                            delta = chunk.choices[0].delta
+                            if delta and hasattr(delta, "content") and delta.content:
+                                field_name = next(iter(indices.keys()))
+                                if field_name in indices:
+                                    event = Event(
+                                        event_id=generate_event_id(),
+                                        execution_id="",
+                                        timestamp=datetime.now(UTC),
+                                        module_name=module_instance.__class__.__name__,
+                                        method_name=pred_name,
+                                        event_type="token",
+                                        data={
+                                            "field": field_name,
+                                            "token": delta.content,
+                                            "token_index": indices[field_name],
+                                        },
+                                    )
+                                    emit_event(event, module_instance)
+                                    indices[field_name] += 1
                         elif isinstance(chunk, dspy.Prediction):
                             result = chunk
 
