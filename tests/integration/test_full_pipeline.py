@@ -160,7 +160,9 @@ class TestFullPipeline:
 
         # Verify execution ID consistency - all events should have the same ID
         execution_ids = {event.execution_id for _, event in received_events}
-        assert len(execution_ids) == 1, f"All events should have same execution_id, got: {execution_ids}"
+        assert len(execution_ids) == 1, (
+            f"All events should have same execution_id, got: {execution_ids}"
+        )
 
     @requires_rabbitmq
     @requires_llm
@@ -236,7 +238,9 @@ class TestFullPipeline:
 
         # Verify correlation data exists and execution IDs are consistent
         execution_ids = {event.execution_id for _, event in received_events}
-        assert len(execution_ids) == 1, f"All events should have same execution_id, got: {execution_ids}"
+        assert len(execution_ids) == 1, (
+            f"All events should have same execution_id, got: {execution_ids}"
+        )
 
         for event_type, event in received_events:
             assert event.execution_id is not None
@@ -252,8 +256,8 @@ class TestFullPipeline:
         # Two different users
         user1_id = f"user1_{generate(size=6)}"
         user2_id = f"user2_{generate(size=6)}"
-        exec1_id = f"exec1_{generate(size=8)}"
-        exec2_id = f"exec2_{generate(size=8)}"
+        f"exec1_{generate(size=8)}"
+        f"exec2_{generate(size=8)}"
 
         # Consumer to collect all events
         consumer = RedisEventConsumer(broker_url="redis://localhost:6379", target=stream_key)
@@ -322,8 +326,12 @@ class TestFullPipeline:
         user1_execution_ids = {e.execution_id for e in user1_events}
         user2_execution_ids = {e.execution_id for e in user2_events}
 
-        assert len(user1_execution_ids) == 1, f"User1 should have one execution_id, got: {user1_execution_ids}"
-        assert len(user2_execution_ids) == 1, f"User2 should have one execution_id, got: {user2_execution_ids}"
+        assert len(user1_execution_ids) == 1, (
+            f"User1 should have one execution_id, got: {user1_execution_ids}"
+        )
+        assert len(user2_execution_ids) == 1, (
+            f"User2 should have one execution_id, got: {user2_execution_ids}"
+        )
 
         # Verify users have different execution IDs (no cross-contamination)
         user1_exec_id = user1_execution_ids.pop()
@@ -468,4 +476,3 @@ class TestFullPipeline:
         print(f"   Tokens collected: {len(collected_tokens)}")
         print(f"   Reconstructed length: {len(reconstructed)}")
         print(f"   Actual answer: {actual_answer}")
-

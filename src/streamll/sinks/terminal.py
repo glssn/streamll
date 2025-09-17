@@ -6,7 +6,12 @@ from streamll.models import Event
 
 
 class TerminalSink:
-    def __init__(self, show_tokens: bool = True, show_data: bool = True, output: TextIO | TextIOWrapper | None = None):
+    def __init__(
+        self,
+        show_tokens: bool = True,
+        show_data: bool = True,
+        output: TextIO | TextIOWrapper | None = None,
+    ):
         self.show_tokens = show_tokens
         self.show_data = show_data
         self.output = output or sys.stdout
@@ -58,7 +63,10 @@ class TerminalSink:
                     # Show custom event data
                     data_items = []
                     for key, value in event.data.items():
-                        if key not in ["user_id", "execution_id"]:  # Skip metadata we show separately
+                        if key not in [
+                            "user_id",
+                            "execution_id",
+                        ]:  # Skip metadata we show separately
                             data_items.append(f"{key}={value}")
                     if data_items:
                         self.output.write(f" | {', '.join(data_items)}")

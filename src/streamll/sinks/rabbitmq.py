@@ -47,7 +47,5 @@ class RabbitMQSink:
         message = json.dumps(event.model_dump(), default=str)
 
         self._channel.basic_publish(
-            exchange=self.exchange,
-            routing_key=self.queue,
-            body=message.encode()
+            exchange=self.exchange, routing_key=self.queue, body=message.encode()
         )

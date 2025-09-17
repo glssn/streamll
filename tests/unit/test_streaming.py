@@ -193,4 +193,3 @@ class TestStreaming:
         assert "end" in event_types
         assert "token" not in event_types
         assert len(sink.tokens) == 0
-

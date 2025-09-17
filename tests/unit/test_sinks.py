@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock, Mock, patch
 
 
-
 from streamll.models import Event
 from streamll.sinks.rabbitmq import RabbitMQSink
 from streamll.sinks.redis import RedisSink

@@ -70,4 +70,3 @@ class RabbitMQEventConsumer:
             self._connection = None
             self._channel = None
             self._queue = None
-

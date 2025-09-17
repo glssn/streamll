@@ -9,7 +9,6 @@
 # streamll = { path = "../", editable = true }
 # ///
 
-import os
 import socket
 import dspy
 import streamll

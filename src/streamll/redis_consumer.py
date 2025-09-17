@@ -73,4 +73,3 @@ class RedisEventConsumer:
         if self._redis:
             self._redis.close()
             self._redis = None
-
